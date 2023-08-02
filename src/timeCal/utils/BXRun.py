@@ -12,6 +12,7 @@ import subprocess
 import numpy as np
 import ROOT
 from pprint import pprint
+from IPython import embed
 
 from .environment import getEnv
 from .dask_utils import MonitoringLoop
@@ -45,10 +46,9 @@ class Task:
             self.subdir = subdir
         else:
             self.subdir = os.path.join(OUTPUT_DIR,subdir)
-        self.temp = []
         if not os.path.exists(self.subdir):
             os.makedirs(self.subdir)
-        self.logger = Logger('Task','debug' if verbose else 'info','buffer',self.subdir)
+        self.logger = Logger('Task','debug' if verbose else 'info','both',self.subdir)
         if len(glob.glob(os.path.join(self.subdir,'BXHist*_harvested.root'))) > 0:
             self.logger.warning(f'Already harvested ROOT files in {self.subdir}')
         else:
@@ -86,23 +86,20 @@ class Task:
         dqm_cmd = self.format_command(['cmsRun',self.script] + args, wdir=self.subdir)
 
         rc,output = self.run_command(dqm_cmd,return_output=True,shell=True,env=self.get_env())
+        self.logger.info(f'... exit code : {rc}')
+        if rc != 0:
+            for line in output:
+                print (line)
+            raise RuntimeError("Failed to produce the DQM root file")
         dqm_file = None
         for line in output:
             self.logger.debug(line)
-            self.temp.append(line)
             if 'BXHist' in line and '.root' in line:
                 for l in line.split():
                     if '.root' in l:
                         dqm_file = l
                 if dqm_file is not None:
                     break
-        self.logger.info(f'... exit code : {rc}')
-        self.temp.append(f'rc,{rc}')
-        return
-        if rc != 0:
-            for line in output:
-                print (line)
-            raise RuntimeError("Failed to produce the DQM root file")
         if dqm_file is None or not '.root' in dqm_file:
             raise RuntimeError(f"Wrong output root file : {dqm_file}")
         else:
@@ -146,9 +143,9 @@ class Task:
         self.logger.info(f'Saved parameters to {param_file}')
 
         # Save logger #
-        log_file = os.path.join(self.subdir,'log.out')
-        self.logger.info(f'Saved log in {log_file}')
-        self.logger.write(log_file)
+        #log_file = os.path.join(self.subdir,'log.out')
+        #self.logger.info(f'Saved log in {log_file}')
+        #self.logger.write(log_file)
 
 
     @staticmethod
@@ -316,13 +313,13 @@ def main():
         logger.info('Running in local mode with the following parameters :')
         for p_name,p_val in run_params.items():
             logger.info(f'... {p_name} = {p_val}')
-        task = Task(args.script,args.output,run_params)
+        task = Task(args.script,args.output,run_params,args.verbose)
     # Dask mode #
     else:
         scan = Scan(args.script,args.output,logger,args.yaml)
         if args.debug:
             logger.info('Entering debug mode, nothing will be submitted')
-            from IPython import embed; embed()
+            embed()
             sys.exit(0)
         # Start cluster #
         if args.dask == 'local':
