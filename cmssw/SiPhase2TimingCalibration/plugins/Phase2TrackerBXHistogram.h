@@ -61,6 +61,8 @@ class Phase2TrackerBXHistogram : public DQMEDAnalyzer{
         // Logics to check whether pixel or strip hit and get track pT //
         bool isPixel(const DetId& detId);
         bool isStrip(const DetId& detId);
+        bool is2S(const DetId& detId, const TrackerGeometry* tGeom);
+        bool isPS(const DetId& detId, const TrackerGeometry* tGeom);
         float getSimTrackPt(EncodedEventId event_id, unsigned int tk_id);
 
         // Structures //
@@ -131,11 +133,15 @@ class Phase2TrackerBXHistogram : public DQMEDAnalyzer{
         HitsPositions hits_positions_;
 
         // Signal shape //
-        std::vector<double> pulseShapeVec_;
+        std::vector<double> cbcPulseShapeVec_;
+        std::vector<double> mpaPulseShapeVec_;
         double cbc3PulsePolarExpansion(double x) const;
-        double signalShape(double x) const;
-        double getSignalScale(double xval) const;
-        void storeSignalShape();
+        double cbcPulseShape(double x) const;
+        double mpaPulseShape(double x) const;
+        double getCBCPulseScale(double xval) const;
+        double getMPAPulseScale(double xval) const;
+        void storeCBCPulseShape();
+        void storeMPAPulseShape();
 
         // Select hit variables //
         static constexpr float bx_time{25};
@@ -144,12 +150,13 @@ class Phase2TrackerBXHistogram : public DQMEDAnalyzer{
 
         // Select Hit logics //
         enum { SquareWindow, SampledMode, LatchedMode, SampledOrLatchedMode, HIPFindingMode };
-        bool select_hit(float charge, int bx, float toa, DetId det_id, int hitDetectionMode);
-        bool select_hit_sampledMode(float charge, int bx, float toa, DetId det_id, float threshold) const;
-        bool select_hit_latchedMode(float charge, int bx, float toa, DetId det_id, float threshold) const;
+        bool select_hit(float charge, int bx, float toa, DetId det_id, int hitDetectionMode, int PSor2S);
+        bool select_hit_sampledMode(float charge, int bx, float toa, DetId det_id, float threshold, int PSor2S) const;
+        bool select_hit_latchedMode(float charge, int bx, float toa, DetId det_id, float threshold, int PSor2S) const;
 
         // Config parameters //
-        std::vector<double> pulseShapeParameters_;
+        std::vector<double> cbcPulseShapeParameters_;
+        std::vector<double> mpaPulseShapeParameters_;
         bool use_mixing_;
         std::string mode_;
         std::string subdet_;
