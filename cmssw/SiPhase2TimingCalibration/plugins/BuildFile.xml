@@ -1,0 +1,22 @@
+<use name="boost"/>
+<use name="root"/>
+<use name="classlib"/>
+<use name="clhep"/>
+<use name="SimDataFormats/TrackerDigiSimLink"/>
+<use name="SimDataFormats/GeneratorProducts"/>
+<use name="DataFormats/SiPixelDigi"/>
+<use name="DataFormats/DetId"/>
+<use name="Geometry/Records"/>
+<use name="Geometry/CommonDetUnit"/>
+<use name="Geometry/TrackerGeometryBuilder"/>
+<use name="FWCore/Framework"/>
+<use name="FWCore/ParameterSet"/>
+<use name="DQMServices/Core"/>
+<use name="DataFormats/Common"/>
+<use name="CommonTools/UtilAlgos"/>
+
+<use name="SimTracker/SiPhase2TimingCalibration"/>
+<library   file="*.cc" name="SiPhase2TimingCalibrationPlugins">
+  <use name="SimGeneral/PreMixingModule"/>
+  <flags   EDM_PLUGIN="1"/>
+</library>
