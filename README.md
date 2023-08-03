@@ -1,5 +1,17 @@
 # Setup
 
+## CMSSW
+
+Current CMSSW release : CMSSW_12_5_0
+
+```
+[CMSSW initialization]
+cmsrel CMSSW_12_5_0
+git cms-addpkg SimTracker
+[cd to this git repo]
+cp -r cmssw/SiPhase2TimingCalibration <path to CMSSW>/src/Simtracker/
+```
+
 ## Environment
 First, one must create the conda environment. To do so, simply run 
 ```
@@ -49,6 +61,13 @@ To run on a single set of parameters, simply provide the parameters as you would
 ```
 The script will take care to run both CMSSW script in the subdirectory, and use default values for the parameters that have been omitted.
 
+### Note on files
+
+To use different files for the HS (hard scattering) and pileup, use the following arguments 
+```
+--HSFile <path_to_txt> --PUFile <path_to_txt>
+```
+where the txt file is a list of GEN-SIM files 
 
 ## Multiple parameters
 The same command can be used to run in parallel the production of multiple histograms using Dask. 
