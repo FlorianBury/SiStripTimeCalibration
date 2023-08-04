@@ -880,13 +880,13 @@ double Phase2TrackerBXHistogram::mpaPulseShape(double x) const {
     double xOffset = mpaPulseShapeParameters_[0];
     double tau = mpaPulseShapeParameters_[1];
     double alpha = mpaPulseShapeParameters[2];
-    double maxCharge = mpaPulseShapeParameters[3];
+    double v0 = mpaPulseShapeparameters[3];
     
     double xx = x - xOffset;
     if (xx < 0)
         return 0;
     
-    return maxCharge * std::pow( xx / tau, alpha ) * std::exp( -xx / tau );
+    return v0 * std::pow( xx / tau, alpha ) * std::exp( -xx / tau );
 }
 
 double Phase2TrackerBXHistogram::cbcPulseShape(double x) const {
