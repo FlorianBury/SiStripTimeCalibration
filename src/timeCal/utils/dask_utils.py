@@ -179,6 +179,7 @@ class MonitoringLoop:
             pass
         def exitLoop(signum,frame):
             raise EndofWaitException
+        signal.signal(signal.SIGALRM, exitLoop)
 
         # Start loop #
         self.updateStatus()
@@ -201,6 +202,11 @@ class MonitoringLoop:
                         signal.alarm(self.interval) # reset the waiting loop
             except EndofWaitException:
                 pass
+
+            # Printout #
+            self.updateStatus()
+            self.printStatusInfo()
+            self.printClusterInfo()
 
             # If nothing still running but not finished #
             if not self.checkRemaining() and not self.checkFinished():

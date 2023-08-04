@@ -37,7 +37,7 @@ HARVESTER_SCRIPT = 'Harvester_cfg.py'
 OUTPUT_DIR = getEnv()['paths']['production']
 
 class Task:
-    def __init__(self,script,subdir,params,verbose=False):
+    def __init__(self,script,subdir,params,worker=False,verbose=False):
         self.script = os.path.join(CMSSW_DIR,script)
         if not os.path.exists(self.script):
             raise RuntimeError(f'Cannot find script {self.script}')
@@ -48,7 +48,7 @@ class Task:
             self.subdir = os.path.join(OUTPUT_DIR,subdir)
         if not os.path.exists(self.subdir):
             os.makedirs(self.subdir)
-        self.logger = Logger('Task','debug' if verbose else 'info','both',self.subdir)
+        self.logger = Logger('Task','debug' if (verbose or worker) else 'info','both' if worker else 'file',self.subdir)
         if len(glob.glob(os.path.join(self.subdir,'BXHist*_harvested.root'))) > 0:
             self.logger.warning(f'Already harvested ROOT files in {self.subdir}')
         else:
@@ -84,13 +84,14 @@ class Task:
         self.logger.info('Starting the DQM file production')
         self.logger.info('Arguments : '+' '.join(args))
         dqm_cmd = self.format_command(['cmsRun',self.script] + args, wdir=self.subdir)
-
+        self.logger.debug(f'Command: {dqm_cmd}')
         rc,output = self.run_command(dqm_cmd,return_output=True,shell=True,env=self.get_env())
         self.logger.info(f'... exit code : {rc}')
         if rc != 0:
+            msg = "Failed to produce the DQM root file :\n"
             for line in output:
-                print (line)
-            raise RuntimeError("Failed to produce the DQM root file")
+                msg += line + "\n"
+            raise RuntimeError(msg)
         dqm_file = None
         for line in output:
             self.logger.debug(line)
@@ -111,13 +112,15 @@ class Task:
 
         self.logger.info('Starting harvesting')
         harvest_cmd = self.format_command(['cmsRun',os.path.join(CMSSW_DIR,HARVESTER_SCRIPT),f'input={dqm_file}'],wdir=self.subdir)
+        self.logger.debug(f'Command: {harvest_cmd}')
         rc = self.run_command(harvest_cmd,shell=True,env=self.get_env())
 
         self.logger.info(f'... exit code : {rc}')
         if rc != 0:
+            msg = "Harvesting failed :\n"
             for line in output:
-                print (line)
-            raise RuntimeError("Harvesting failed")
+                msg += line + "\n"
+            raise RuntimeError(msg)
 
         self.logger.info('Starting renaming')
         hist_file = dqm_file.replace('raw','harvested')
@@ -129,12 +132,12 @@ class Task:
         self.logger.info(f'... exit code : {rc}')
         self.logger.info(f'Renamed to {hist_file}')
 
-        #self.logger.info ('Starting cleaning')
-        #clean_cmd = ['rm', dqm_file]
-        #rc = self.run_command(clean_cmd)
-        #if rc != 0:
-        #    raise RuntimeError("Could note clean intermediate root file")
-        #self.logger.info (f'... exit code : {rc}')
+        self.logger.info ('Starting cleaning')
+        clean_cmd = ['rm', dqm_file]
+        rc = self.run_command(clean_cmd)
+        if rc != 0:
+            raise RuntimeError("Could note clean intermediate root file")
+        self.logger.info (f'... exit code : {rc}')
 
         # Save parameters in json #
         param_file = os.path.join(self.subdir,'params.json')
@@ -260,6 +263,11 @@ class Scan:
         # check with what has been produced already #
         subdirNums = []
         for subdir in glob.glob(self.outputPaths['results']+'/*'):
+            # Check root file #
+            r_files = glob.glob(os.path.join(subdir,'*harvested*root'))
+            if len(r_files) == 0:
+                continue
+            # Check parameters #
             p_file = os.path.join(subdir,'params.json')
             if os.path.exists(p_file):
                 with open(p_file,'r') as handle:
@@ -313,7 +321,13 @@ def main():
         logger.info('Running in local mode with the following parameters :')
         for p_name,p_val in run_params.items():
             logger.info(f'... {p_name} = {p_val}')
-        task = Task(args.script,args.output,run_params,args.verbose)
+        task = Task(
+            script = args.script,
+            subdir = args.output,
+            params = run_params,
+            worker = True,
+            verbose = args.verbose,
+        )
     # Dask mode #
     else:
         scan = Scan(args.script,args.output,logger,args.yaml)
