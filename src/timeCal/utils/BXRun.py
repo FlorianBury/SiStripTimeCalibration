@@ -17,7 +17,7 @@ from IPython import embed
 from .environment import getEnv
 from .dask_utils import MonitoringLoop
 from .logger import Logger
-from .yamlLoader import YMLIncludeLoader
+from .yamlLoader import parseYaml
 
 DEFAULT_PARAMS = {
     'N'                  : 1,
@@ -215,8 +215,7 @@ class Scan:
             self.logger.info('Taking config file from input {self.yaml_path}')
             path = self.yaml_path
 
-        with open(path,'r') as handle:
-            config = self.processParameters(yaml.load(handle,Loader=YMLIncludeLoader))
+        config = self.processParameters(parseYaml(path))
         if not os.path.exists(saved_cfg_path):
             with open(saved_cfg_path,'w') as handle:
                 yaml.dump(config,handle)

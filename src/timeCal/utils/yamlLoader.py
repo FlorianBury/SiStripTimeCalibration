@@ -65,3 +65,21 @@ class YMLIncludeLoader(yaml.SafeLoader):
 
 
 YMLIncludeLoader.add_constructor("!include", YMLIncludeLoader.include)
+
+
+def parseYaml(yamlPath,custom=None):
+    if custom is not None:
+        # Custom command line argument for parsing #
+        formatting = {}
+        for arg in custom:
+            if '=' in arg:
+                formatting[arg.split('=')[0]] = arg.split('=')[1]
+            else:
+                logging.warning(f'`--custom {arg}` will be ignored because no `=`')
+        config = yaml.load({'filename':yamlPath,'formatting':formatting},
+                      Loader=YMLIncludeLoader)
+    else:
+        # Classic parse #
+        with open(yamlPath,'r') as handle:
+            config = yaml.load(handle,Loader=YMLIncludeLoader)
+    return config
