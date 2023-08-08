@@ -164,7 +164,7 @@ class MonitoringLoop:
             embed()
 
 
-    def start(self,wait=None):
+    def start(self,wait=None,close_at_end=True):
         # Check if finished #
         self.updateStatus()
         if self.checkFinished():
@@ -217,5 +217,6 @@ class MonitoringLoop:
                         break
 
         self.logger.info('All jobs finished successfully')
-        self.close()
+        if close_at_end:
+            self.close()
 

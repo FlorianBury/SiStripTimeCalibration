@@ -319,12 +319,13 @@ class PlotScan:
                 def func(processor,f):
                     return processor(f)
                 futures = client.map(func,[self.processor]*len(self.files),self.files)
-                loop = MonitoringLoop(futures,client,cluster,self.logger,60)
+                loop = MonitoringLoop(futures,client,cluster,self.logger,20)
                 loop.start(close_at_end=False)
                 if not loop.checkFinished():
                     raise RuntimeError('Seems like not all futures are finished, this should not happen')
                 # Concatenate (need to find faster) #
                 content = [entry for future in futures for entry in future.result()]
+                loop.close()
             df = pd.DataFrame(content)
             df.to_pickle(self.cache)
             self.logger.info(f'Saved cache in {self.cache}')
