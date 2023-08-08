@@ -18,6 +18,7 @@ from .environment import getEnv
 from .dask_utils import MonitoringLoop
 from .logger import Logger
 from .yamlLoader import parseYaml
+from .scan_utils import makeScan
 
 DEFAULT_PARAMS = {
     'N'                  : 1,
@@ -146,6 +147,13 @@ class Task:
             json.dump(self.params,handle)
         self.logger.info(f'Saved parameters to {param_file}')
 
+        # Save parameters in root file #
+        F = ROOT.TFile(hist_file,"UPDATE")
+        for name,arg in self.params.items():
+            p = ROOT.TNamed(name,str(arg))
+            p.Write()
+        F.Close()
+
         # Save logger #
         #log_file = os.path.join(self.subdir,'log.out')
         #self.logger.info(f'Saved log in {log_file}')
@@ -200,8 +208,10 @@ class Scan:
         self.logger = logger
         self.yaml_path = yaml_path
         self.paramDict = self.getConfigContent()
-        self.paramNames = list(self.paramDict.keys())
-        self.paramValues = self.parameterCombinations()
+        self.paramNames, self.paramValues = makeScan(self.paramDict)
+        self.logger.info('Parameters for scan :')
+        for pName in self.paramNames:
+            self.logger.info(f'... {pName:30s}: {self.paramDict[pName]}')
         self.args = self.makeDaskArgs()
 
     def getConfigContent(self):
@@ -215,7 +225,7 @@ class Scan:
             self.logger.info('Taking config file from input {self.yaml_path}')
             path = self.yaml_path
 
-        config = self.processParameters(parseYaml(path))
+        config = parseYaml(path)
         if not os.path.exists(saved_cfg_path):
             with open(saved_cfg_path,'w') as handle:
                 yaml.dump(config,handle)
@@ -232,30 +242,6 @@ class Scan:
             if not os.path.exists(path):
                 os.makedirs(path)
         return outputPaths
-
-    def processParameters(self,config):
-        params = {}
-        for pName in sorted(config.keys()):
-            pVal = config[pName]
-            if not isinstance(pVal,(list,tuple,np.ndarray)):
-                pVal = [pVal]
-            params[pName] = pVal
-        self.logger.info('Parameters for scan :')
-        for pName, pVal in params.items():
-            self.logger.info(f'... {pName:30s}: {pVal}')
-        return params
-
-    def parameterCombinations(self):
-        paramValues = []
-        for prod in itertools.product(*self.paramDict.values()):
-            inputParam = []
-            for p in prod:
-                if isinstance(p,float):
-                    p = round(p,10) # Truncation of 0.000..00x problems
-                inputParam.append(str(p))
-            paramValues.append(inputParam)
-        self.logger.info (f'Generated {len(paramValues)} combinations')
-        return paramValues
 
     def makeDaskArgs(self):
         # Make list of params dicts #
