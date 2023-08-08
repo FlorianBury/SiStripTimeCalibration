@@ -25,6 +25,7 @@ from ..utils.yamlLoader import parseYaml
 from ..utils.environment import getEnv
 from ..utils.context import TFileOpen
 from ..utils.scan_utils import makeScan
+from ..utils.dask_utils import MonitoringLoop
 from ..utils.logger import Logger
 
 OBSERVABLES = ['Efficiency',
@@ -300,13 +301,13 @@ class PlotScan:
             # Parallel working #
             else:
                 # Start cluster #
-                if args.dask == 'local':
+                if self.mode == 'local':
                     from dask.distributed import LocalCluster
                     cluster = LocalCluster(n_workers=10,threads_per_worker=1,memory_limit='6GiB',scheduler_port=1234)
-                elif args.dask == 'slurm':
+                elif self.mode == 'slurm':
                     from dask_jobqueue import SLURMCluster
                     cluster = SLURMCluster()
-                elif args.dask == 'htcondor':
+                elif self.mode == 'htcondor':
                     from dask_jobqueue import HTCondorCluster
                     cluster = HTCondorCluster()
                 else:
@@ -318,14 +319,12 @@ class PlotScan:
                 def func(processor,f):
                     return processor(f)
                 futures = client.map(func,[self.processor]*len(self.files),self.files)
-                loop = MonitoringLoop(futures,client,cluster,logger,60)
-                loop.start()
-                #pool = mp.Pool(self.jobs)
-                #for content in pool.imap(self.processor,self.files):
-                #    pbar.update()
-                #    self.content.extend(content)
-                #pool.close()
-                #pool.join()
+                loop = MonitoringLoop(futures,client,cluster,self.logger,60)
+                loop.start(close_at_end=False)
+                if not loop.checkFinished():
+                    raise RuntimeError('Seems like not all futures are finished, this should not happen')
+                # Concatenate (need to find faster) #
+                content = [entry for future in futures for entry in future.result()]
             df = pd.DataFrame(content)
             df.to_pickle(self.cache)
             self.logger.info(f'Saved cache in {self.cache}')
@@ -336,6 +335,7 @@ class PlotScan:
         self.data = Data(df)
         self.logger.info('... done')
         self.data.SetParameters(list(self.labels.values()) + ['delay'])
+
 
     def Plots(self):
         path_plots = os.path.join(getEnv()['paths']['scans'],'plots',self.output)
@@ -360,10 +360,7 @@ class PlotScan:
                 for comb in itertools.product(*list(labels_to_vary.values())):
                     varied_labels = {k:c for k,c in zip(labels_to_vary.keys(),comb)}
                     obs2d = observable.GetSlice(**varied_labels)
-                    try:
-                        data_dict = {'2D':obs2d.GetRootTGraph2D(x='delay',y=param)}
-                    except:
-                        from IPython import embed; embed()
+                    data_dict = {'2D':obs2d.GetRootTGraph2D(x='delay',y=param)}
                     fig_name = f'{"_".join([f"{p}_{v}" for p,v in varied_labels.items()])}'.replace(' ','_')
 
                     # Plot 1D #
