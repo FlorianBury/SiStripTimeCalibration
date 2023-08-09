@@ -17,6 +17,8 @@ from IPython import embed
 from .environment import getEnv
 from .dask_utils import MonitoringLoop
 from .logger import Logger
+from .yamlLoader import parseYaml
+from .scan_utils import makeScan
 
 DEFAULT_PARAMS = {
     'N'                  : 1,
@@ -37,7 +39,7 @@ HARVESTER_SCRIPT = 'Harvester_cfg.py'
 OUTPUT_DIR = getEnv()['paths']['production']
 
 class Task:
-    def __init__(self,script,subdir,params,verbose=False):
+    def __init__(self,script,subdir,params,worker=False,verbose=False):
         self.script = os.path.join(CMSSW_DIR,script)
         if not os.path.exists(self.script):
             raise RuntimeError(f'Cannot find script {self.script}')
@@ -48,7 +50,7 @@ class Task:
             self.subdir = os.path.join(OUTPUT_DIR,subdir)
         if not os.path.exists(self.subdir):
             os.makedirs(self.subdir)
-        self.logger = Logger('Task','debug' if verbose else 'info','both',self.subdir)
+        self.logger = Logger('Task','debug' if (verbose or worker) else 'info','both' if worker else 'file',self.subdir)
         if len(glob.glob(os.path.join(self.subdir,'BXHist*_harvested.root'))) > 0:
             self.logger.warning(f'Already harvested ROOT files in {self.subdir}')
         else:
@@ -84,13 +86,14 @@ class Task:
         self.logger.info('Starting the DQM file production')
         self.logger.info('Arguments : '+' '.join(args))
         dqm_cmd = self.format_command(['cmsRun',self.script] + args, wdir=self.subdir)
-
+        self.logger.debug(f'Command: {dqm_cmd}')
         rc,output = self.run_command(dqm_cmd,return_output=True,shell=True,env=self.get_env())
         self.logger.info(f'... exit code : {rc}')
         if rc != 0:
+            msg = "Failed to produce the DQM root file :\n"
             for line in output:
-                print (line)
-            raise RuntimeError("Failed to produce the DQM root file")
+                msg += line + "\n"
+            raise RuntimeError(msg)
         dqm_file = None
         for line in output:
             self.logger.debug(line)
@@ -111,13 +114,15 @@ class Task:
 
         self.logger.info('Starting harvesting')
         harvest_cmd = self.format_command(['cmsRun',os.path.join(CMSSW_DIR,HARVESTER_SCRIPT),f'input={dqm_file}'],wdir=self.subdir)
+        self.logger.debug(f'Command: {harvest_cmd}')
         rc = self.run_command(harvest_cmd,shell=True,env=self.get_env())
 
         self.logger.info(f'... exit code : {rc}')
         if rc != 0:
+            msg = "Harvesting failed :\n"
             for line in output:
-                print (line)
-            raise RuntimeError("Harvesting failed")
+                msg += line + "\n"
+            raise RuntimeError(msg)
 
         self.logger.info('Starting renaming')
         hist_file = dqm_file.replace('raw','harvested')
@@ -129,18 +134,25 @@ class Task:
         self.logger.info(f'... exit code : {rc}')
         self.logger.info(f'Renamed to {hist_file}')
 
-        #self.logger.info ('Starting cleaning')
-        #clean_cmd = ['rm', dqm_file]
-        #rc = self.run_command(clean_cmd)
-        #if rc != 0:
-        #    raise RuntimeError("Could note clean intermediate root file")
-        #self.logger.info (f'... exit code : {rc}')
+        self.logger.info ('Starting cleaning')
+        clean_cmd = ['rm', dqm_file]
+        rc = self.run_command(clean_cmd)
+        if rc != 0:
+            raise RuntimeError("Could note clean intermediate root file")
+        self.logger.info (f'... exit code : {rc}')
 
         # Save parameters in json #
         param_file = os.path.join(self.subdir,'params.json')
         with open(param_file,'w') as handle:
             json.dump(self.params,handle)
         self.logger.info(f'Saved parameters to {param_file}')
+
+        # Save parameters in root file #
+        F = ROOT.TFile(hist_file,"UPDATE")
+        for name,arg in self.params.items():
+            p = ROOT.TNamed(name,str(arg))
+            p.Write()
+        F.Close()
 
         # Save logger #
         #log_file = os.path.join(self.subdir,'log.out')
@@ -196,8 +208,10 @@ class Scan:
         self.logger = logger
         self.yaml_path = yaml_path
         self.paramDict = self.getConfigContent()
-        self.paramNames = list(self.paramDict.keys())
-        self.paramValues = self.parameterCombinations()
+        self.paramNames, self.paramValues = makeScan(self.paramDict)
+        self.logger.info('Parameters for scan :')
+        for pName in self.paramNames:
+            self.logger.info(f'... {pName:30s}: {self.paramDict[pName]}')
         self.args = self.makeDaskArgs()
 
     def getConfigContent(self):
@@ -211,8 +225,7 @@ class Scan:
             self.logger.info('Taking config file from input {self.yaml_path}')
             path = self.yaml_path
 
-        with open(path,'r') as handle:
-            config = self.processParameters(yaml.load(handle,Loader=yaml.FullLoader))
+        config = parseYaml(path)
         if not os.path.exists(saved_cfg_path):
             with open(saved_cfg_path,'w') as handle:
                 yaml.dump(config,handle)
@@ -230,36 +243,17 @@ class Scan:
                 os.makedirs(path)
         return outputPaths
 
-    def processParameters(self,config):
-        params = {}
-        for pName in sorted(config.keys()):
-            pVal = config[pName]
-            if not isinstance(pVal,(list,tuple,np.ndarray)):
-                pVal = [pVal]
-            params[pName] = pVal
-        self.logger.info('Parameters for scan :')
-        for pName, pVal in params.items():
-            self.logger.info(f'... {pName:30s}: {pVal}')
-        return params
-
-    def parameterCombinations(self):
-        paramValues = []
-        for prod in itertools.product(*self.paramDict.values()):
-            inputParam = []
-            for p in prod:
-                if isinstance(p,float):
-                    p = round(p,10) # Truncation of 0.000..00x problems
-                inputParam.append(str(p))
-            paramValues.append(inputParam)
-        self.logger.info (f'Generated {len(paramValues)} combinations')
-        return paramValues
-
     def makeDaskArgs(self):
         # Make list of params dicts #
         fullParams = [{pN:pV for pN,pV in zip(self.paramNames,paramValues)} for paramValues in self.paramValues]
         # check with what has been produced already #
         subdirNums = []
         for subdir in glob.glob(self.outputPaths['results']+'/*'):
+            # Check root file #
+            r_files = glob.glob(os.path.join(subdir,'*harvested*root'))
+            if len(r_files) == 0:
+                continue
+            # Check parameters #
             p_file = os.path.join(subdir,'params.json')
             if os.path.exists(p_file):
                 with open(p_file,'r') as handle:
@@ -313,7 +307,13 @@ def main():
         logger.info('Running in local mode with the following parameters :')
         for p_name,p_val in run_params.items():
             logger.info(f'... {p_name} = {p_val}')
-        task = Task(args.script,args.output,run_params,args.verbose)
+        task = Task(
+            script = args.script,
+            subdir = args.output,
+            params = run_params,
+            worker = True,
+            verbose = args.verbose,
+        )
     # Dask mode #
     else:
         scan = Scan(args.script,args.output,logger,args.yaml)

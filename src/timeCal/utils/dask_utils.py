@@ -164,7 +164,7 @@ class MonitoringLoop:
             embed()
 
 
-    def start(self,wait=None):
+    def start(self,wait=None,close_at_end=True):
         # Check if finished #
         self.updateStatus()
         if self.checkFinished():
@@ -179,6 +179,7 @@ class MonitoringLoop:
             pass
         def exitLoop(signum,frame):
             raise EndofWaitException
+        signal.signal(signal.SIGALRM, exitLoop)
 
         # Start loop #
         self.updateStatus()
@@ -202,6 +203,11 @@ class MonitoringLoop:
             except EndofWaitException:
                 pass
 
+            # Printout #
+            self.updateStatus()
+            self.printStatusInfo()
+            self.printClusterInfo()
+
             # If nothing still running but not finished #
             if not self.checkRemaining() and not self.checkFinished():
                 self.logger.info('Not any remaining running nor pending job, yet not all have finished successfully.\nWill let you decide what to do, while still checking for success in all jobs to resume the program (type `help` for details)')
@@ -211,5 +217,6 @@ class MonitoringLoop:
                         break
 
         self.logger.info('All jobs finished successfully')
-        self.close()
+        if close_at_end:
+            self.close()
 
