@@ -285,8 +285,8 @@ void Phase2TrackerBXHistogram::analyze(const edm::Event& iEvent, const edm::Even
         cbcPulseShapeParameters_[0] = *offset;
         mpaPulseShapeParameters_[0] = *offset;
         
-        Phase2TrackerBXHistogram::storeCBCSignalShape();
-        Phase2TrackerBXHistogram::storeMPASignalShape();
+        Phase2TrackerBXHistogram::storeCBCPulseShape();
+        Phase2TrackerBXHistogram::storeMPAPulseShape();
         if (verbosity_>1){
             std::cout << "CBC Pulse shape params : "<<std::endl;
             for(std::vector<double>::iterator psp = cbcPulseShapeParameters_.begin(); psp != cbcPulseShapeParameters_.end(); ++psp) {
@@ -432,8 +432,18 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
     
     // check if 2S or PS
     int PSor2S = -1;
-    if (is2S(detId, tGeom)) { PSor2S = 1; }
-    else if (isPS(detId, tGeom)) { PSor2S = 0; }
+    if (is2S(detId, tGeom)) {
+        PSor2S = 1;
+        if (verbosity_ > 1){
+            std::cout<<"\tIs a 2S module"<<std::endl;
+        }
+    }
+    else if (isPS(detId, tGeom)) {
+        PSor2S = 0;
+        if (verbosity_ > 1){
+            std::cout<<"\tIs a PS module"<<std::endl;
+        }
+    }
     
     if (PSor2S == -1) {
         if (verbosity_ > 1){
@@ -716,7 +726,7 @@ bool Phase2TrackerBXHistogram::is2S(const DetId& detId, const TrackerGeometry* t
         Check if hit on detid is 2S module
     */
     TrackerGeometry::ModuleType mType = TrackerGeometry::ModuleType::UNKNOWN;
-    mType = tGeom_->getDetectorType(detId);
+    mType = tGeom->getDetectorType(detId);
     
     return (mType == TrackerGeometry::ModuleType::Ph2SS);
 }
@@ -726,7 +736,7 @@ bool Phase2TrackerBXHistogram::isPS(const DetId& detId, const TrackerGeometry* t
         Check if hit on detid is strip
     */
     TrackerGeometry::ModuleType mType = TrackerGeometry::ModuleType::UNKNOWN;
-    mType = tGeom_->getDetectorType(detId);
+    mType = tGeom->getDetectorType(detId);
     
     return (mType == TrackerGeometry::ModuleType::Ph2PSS);
 }
@@ -761,7 +771,14 @@ bool Phase2TrackerBXHistogram::select_hit(float charge, int bx, float toa, DetId
     if (verbosity_>3)
         std::cout<<"Detid : "<<det_id.rawId()<<" -> TOA = "<<toa<<" + "<<tofsmeared<<std::endl;
     toa += tofsmeared;
-
+    
+//    typedef double (Phase2TrackerBXHistogram::*pulseScalePtr)(double) const;
+//    pulseScalePtr getSignalScale;
+//    if (PSor2S == 1) {
+//        getSignalScale = &Phase2TrackerBXHistogram::getCBCPulseScale; // Assign the member function
+//    } else if (PSor2S == 0) {
+//        getSignalScale = &Phase2TrackerBXHistogram::getMPAPulseScale; // Assign the member function
+//    }
     
     if (hitDetectionMode == Phase2TrackerBXHistogram::SampledMode){
         if (verbosity_>3)
@@ -788,11 +805,13 @@ bool Phase2TrackerBXHistogram::select_hit_sampledMode(float charge, int bx, floa
     toa -= bx*bx_time;
     double sampling_time = bx_time;
     
-    double (*getSignalScale)(double);
-    if (PSor2S == 1) { getSignalScale = getCBCPulseScale; }
-    else if (PSor2S == 0) { getSignalScale = getMPAPulseScale; }
-    
-    double sigScale = getSignalScale( sampling_time - toa )
+    double (Phase2TrackerBXHistogram::*getSignalScale)(double) const;
+    if (PSor2S == 1) { getSignalScale = &Phase2TrackerBXHistogram::getCBCPulseScale; }
+    else if (PSor2S == 0) { getSignalScale = &Phase2TrackerBXHistogram::getMPAPulseScale; }
+//
+    // double sigScale = getSignalScale( sampling_time - toa );
+    double sigScale = (this->*getSignalScale)(sampling_time - toa);
+    // double sigScale = pulseScalePtr( sampling_time - toa );
 
     if (verbosity_>3){
         std::cout<<"\t(ToF) "<<toa+bx*bx_time<<" -> (corrected for BX "<<bx<<") "<<toa<<std::endl;
@@ -809,18 +828,21 @@ bool Phase2TrackerBXHistogram::select_hit_latchedMode(float charge, int bx, floa
     /*
         Hit detect logic : latched mode
     */
+    // double (*pulseScalePtr)(double) // in args
     toa -= bx * bx_time;
 
     float sampling_time = 0;
     bool lastPulse = true;
     bool aboveThr = false;
-    
-    double (*getSignalScale)(double);
-    if (PSor2S == 1) { getSignalScale = getCBCPulseScale; }
-    else if (PSor2S == 0) { getSignalScale = getMPAPulseScale; }
+
+    double (Phase2TrackerBXHistogram::*getSignalScale)(double) const;
+    if (PSor2S == 1) { getSignalScale = &Phase2TrackerBXHistogram::getCBCPulseScale; }
+    else if (PSor2S == 0) { getSignalScale = &Phase2TrackerBXHistogram::getMPAPulseScale; }
     
     for (float i = deadTime_; i <= bx_time; i++) {
-        double sigScale = getSignalScale(sampling_time - toa + i);
+        // double sigScale = getSignalScale(sampling_time - toa + i);
+        double sigScale = (this->*getSignalScale)(sampling_time - toa);
+        // double sigScale = pulseScalePtr( sampling_time - toa );
         if (verbosity_>3)
             std::cout<<"\tTime "<<sampling_time - toa + i <<" : (scale) "<<sigScale<<" * (charge) "<<charge<< " = "<<sigScale*charge<<" -> Trigger "<<int(sigScale * charge > threshold)<<std::endl;
 
@@ -879,8 +901,8 @@ double Phase2TrackerBXHistogram::mpaPulseShape(double x) const {
     
     double xOffset = mpaPulseShapeParameters_[0];
     double tau = mpaPulseShapeParameters_[1];
-    double alpha = mpaPulseShapeParameters[2];
-    double v0 = mpaPulseShapeparameters[3];
+    double alpha = mpaPulseShapeParameters_[2];
+    double v0 = mpaPulseShapeParameters_[3];
     
     double xx = x - xOffset;
     if (xx < 0)
