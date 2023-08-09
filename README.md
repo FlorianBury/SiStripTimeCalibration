@@ -119,3 +119,70 @@ At the end of the comptations, if all the jobs are finished they will be aggrega
 
 # Scan plots
 
+The CLI is through the `plotScan` command, used like the following 
+```
+    plotScan --yaml <config yaml> --custom <...> -i <input directory> -o <output directory> --mode <mode>
+```
+the argument are as follows
+- `--yaml` : yaml config, see below
+- `--custom` : allows to parameterise the yaml file, for example to choose the mode (with `{mode}` in the yaml and in the command `--custom mode=Sampled`)
+- `-i/--input` : name of the subdirectory in the `production` directory of the `timerc`
+- `-o/--output` : name of the subdirectory in the `scan` directory of the `timerc`
+- `--mode` : can be `worker` (will work in series in a loop), or a dask mode (`local`, `slurm` or `htcondor`) 
+
+## Yaml config
+
+This is where you provide the information for the script to run, an example is below :
+```yaml
+parameters:
+  pt: [2]
+  threshold: [4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000]
+  thresholdsmearing: [0, 100, 200, 300, 400, 500]
+  tofsmearing: [0.0, 0.5, 1.0, 1.5, 2.0]
+  N: 10
+  pileup: [200]
+  HSfile: <path>
+  PUfile: <path>
+
+labels:
+  threshold: Threshold
+  thresholdsmearing: Threshold Smearing
+  tofsmearing: ToF Smearing
+
+efficiency: 
+  truth: HitsTrueNumberScan{mode}
+  reco:  OffsetScan{mode}
+  dir: "DQMData/Run 1/Ph2TkBXHist/Run summary/Hist2D"
+
+firerate:
+  truth: HitsTrueNumberScan{mode}
+  reco:  AttributionScan{mode}
+  dir: "DQMData/Run 1/Ph2TkBXHist/Run summary/Hist2D"
+
+hists: !include hists.yml
+```
+
+The `parameters` will be used in the scan, looking for corresponding values in the subdirectory provided by the `--input` argument (which checks that everything is there). 
+
+The `labels` are just renaming for the plots.
+
+`efficiency` and `firerate` are to provide the name of the histograms to compute related observables.
+
+Finally, `hists.yml` contains the info to extract all the BX ID histograms, for example 
+```yaml
+BXHistogram{mode}Offset0p000000:
+  delay: 0.0
+  dir: "DQMData/Run 1/Ph2TkBXHist/Run summary/Hist1D"
+BXHistogram{mode}Offset0p100000:
+  delay: 0.1
+  dir: "DQMData/Run 1/Ph2TkBXHist/Run summary/Hist1D"
+BXHistogram{mode}Offset0p200000:
+  delay: 0.2
+  dir: "DQMData/Run 1/Ph2TkBXHist/Run summary/Hist1D"
+BXHistogram{mode}Offset0p300000:
+  delay: 0.3
+  dir: "DQMData/Run 1/Ph2TkBXHist/Run summary/Hist1D"
+[...]
+```
+
+
