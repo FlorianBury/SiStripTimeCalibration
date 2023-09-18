@@ -60,7 +60,7 @@ class Phase2TrackerBXHistogram : public DQMEDAnalyzer{
 
         // Logics to check whether pixel or strip hit and get track pT //
         bool isPixel(const DetId& detId);
-        bool isStrip(const DetId& detId);
+        bool isStrip(const DetId& detId, int subDetDiscriminant);
         bool is2S(const DetId& detId, const TrackerGeometry* tGeom);
         bool isPS(const DetId& detId, const TrackerGeometry* tGeom);
         float getSimTrackPt(EncodedEventId event_id, unsigned int tk_id);
@@ -72,6 +72,9 @@ class Phase2TrackerBXHistogram : public DQMEDAnalyzer{
         };
 
         struct HitsPositions{  // Save hit positions
+            MonitorElement* positions3D_presel_2S;
+            MonitorElement* positions3D_presel_PS;
+            MonitorElement* positions3D_presel_Strip;
             MonitorElement* positions3D;
             MonitorElement* positions2D;
             MonitorElement* positions2DAbs;
@@ -157,6 +160,8 @@ class Phase2TrackerBXHistogram : public DQMEDAnalyzer{
         // Config parameters //
         std::vector<double> cbcPulseShapeParameters_;
         std::vector<double> mpaPulseShapeParameters_;
+        int specifyStripModule_;
+        int subDetDiscriminant_;
         bool use_mixing_;
         std::string mode_;
         std::string subdet_;

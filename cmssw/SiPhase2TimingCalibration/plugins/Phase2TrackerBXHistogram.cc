@@ -94,6 +94,8 @@ Phase2TrackerBXHistogram::Phase2TrackerBXHistogram(const edm::ParameterSet& iCon
     geomToken_(esConsumes<TrackerGeometry, TrackerDigiGeometryRecord>(edm::ESInputTag{"", geomType_})),
     cbcPulseShapeParameters_(config_.getParameter<std::vector<double>>("CBCPulseShapeParameters")),
     mpaPulseShapeParameters_(config_.getParameter<std::vector<double>>("MPAPulseShapeParameters")),
+    specifyStripModule_(config_.getParameter<int>("SpecifyStripModule")),
+    subDetDiscriminant_(config_.getParameter<int>("SubDetDiscriminant")),
     use_mixing_(config_.getParameter<bool>("UseMixing")),
     mode_(config_.getParameter<std::string>("Mode")),
     subdet_(config_.getParameter<std::string>("Subdetector")),
@@ -133,11 +135,16 @@ Phase2TrackerBXHistogram::Phase2TrackerBXHistogram(const edm::ParameterSet& iCon
         std::cout << "Threshold Smearing (Endcap) : "<<theThresholdSmearing_Endcap_<<std::endl;
         std::cout << "Threshold Smearing (Barrel) : "<<theThresholdSmearing_Barrel_<<std::endl;
         std::cout << "ToF smearing                : "<<tof_smearing_<<std::endl;
+        // 0 for no selection, 1 for merged, 2 for neither, 3 for 2S, 4 for PS
+        std::cout << "Specify Strip Module        : "<<specifyStripModule_<<std::endl;
         if (mode_ == "emulate")
             std::cout << "Offset for emulation        : "<<offset_emulate_<<std::endl;
     }
     if (mode_ != "scan" && mode_ != "emulate"){
         throw std::invalid_argument("Mode "+mode_+" not understood");
+    }
+    if (specifyStripModule_ != 0 && specifyStripModule_ != 1 && specifyStripModule_ != 2){
+        throw std::invalid_argument("Strip Module specification not understood");
     }
 
     if (dims_per_subdet.find(subdet_) == dims_per_subdet.end()) {
@@ -421,13 +428,25 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
         // We are using this dZ cutoff to try to reject SimHits coming from  delta rays which has a very short track length.
         return;
     }
-
-    // check if strip //
-    if (!isStrip(detId)){
+    
+    // Get hit information //
+    // New position
+    const GeomDet *geomDet = tGeom->idToDet(detId);
+    if (!geomDet){
+        if (verbosity_>1){
+            std::cout<<"\tGeometry not valid"<<std::endl;
+        }
+        return;
+    }
+    Global3DPoint pdPos = geomDet->surface().toGlobal(isim->localPosition());
+    
+    int isStripHit = -1;
+    if (isStrip(detId, subDetDiscriminant_)){
         if (verbosity_ > 1){
             std::cout<<"\tNot a strip hit ("<< rawid <<") -> discarded"<<std::endl;
         }
-        return;
+        hits_positions_.positions3D_presel_Strip->Fill(pdPos.z(),pdPos.x(),pdPos.y());
+        isStripHit = 1;
     }
     
     // check if 2S or PS
@@ -437,21 +456,50 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
         if (verbosity_ > 1){
             std::cout<<"\tIs a 2S module"<<std::endl;
         }
+        hits_positions_.positions3D_presel_PS->Fill(pdPos.z(),pdPos.x(),pdPos.y());
     }
     else if (isPS(detId, tGeom)) {
         PSor2S = 0;
         if (verbosity_ > 1){
             std::cout<<"\tIs a PS module"<<std::endl;
         }
+        hits_positions_.positions3D_presel_2S->Fill(pdPos.z(),pdPos.x(),pdPos.y());
     }
     
     if (PSor2S == -1) {
         if (verbosity_ > 1){
-            std::cout<<"\tNot a 2S or PS module ("<< rawid <<") -> discarded"<<std::endl;
+            std::cout<<"\tNot a 2S or PS module ("<< rawid <<")"<<std::endl;
         }
-        return;
     }
+    
+    // Post selection 3D histograms
+    // 0 for 2S/PS/Strip, 1 for 2S/PS without Strip, 2 for Strip without 2S/PS
+    if (specifyStripModule_ == 0){
+        if (PSor2S == -1 and isStripHit == -1) { return; }
+    }
+    else if (specifyStripModule_ == 1){
+        if (PSor2S == -1 and isStripHit != -1 ) { return; }
+    }
+    else if (specifyStripModule_ == 2){
+        if (PSor2S != -1 and isStripHit == -1 ) { return; }
+    }
+    PSor2S = 1;
+    
+    // new position for checks
+    // Fill position histograms //
+//    hits_positions_.positions3D->Fill(pdPos.z(),pdPos.x(),pdPos.y());
+//    hits_positions_.positions2D->Fill(pdPos.z(),std::hypot(pdPos.x(),pdPos.y())*((pdPos.y()>=0)-(pdPos.y()<0)));
+//    hits_positions_.positions2DAbs->Fill(fabs(pdPos.z()),std::hypot(pdPos.x(),pdPos.y()));
 
+    // check if strip //
+    // subDetDiscriminant_ 0 = ALL, 1 = TIB, 2 = TID, 3 = TOB, 4 = TEC
+//    if (!isStrip(detId, subDetDiscriminant_)){
+//        if (verbosity_ > 1){
+//            std::cout<<"\tNot a strip hit ("<< rawid <<") -> discarded"<<std::endl;
+//        }
+//        return;
+//    }
+    
     // Layer and geometry //
     int layer = tTopo->getOTLayerNumber(rawid);
     if (verbosity_ > 1){
@@ -466,16 +514,17 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
             std::cout<<" subdet TEC"<<std::endl;
     }
     if (layer < 0) return;
-    const GeomDet *geomDet = tGeom->idToDet(detId);
-    if (!geomDet){
-        if (verbosity_>1){
-            std::cout<<"\tGeometry not valid"<<std::endl;
-        }
-        return;
-    }
+//    const GeomDet *geomDet = tGeom->idToDet(detId);
+//    if (!geomDet){
+//        if (verbosity_>1){
+//            std::cout<<"\tGeometry not valid"<<std::endl;
+//        }
+//        return;
+//    }
 
-    // Get hit information //
-    Global3DPoint pdPos = geomDet->surface().toGlobal(isim->localPosition());
+    // original
+//    // Get hit information //
+//    Global3DPoint pdPos = geomDet->surface().toGlobal(isim->localPosition());
 
     int event = simHit.eventId().event();
     float time_to_detid_ns = pdPos.mag()/(CLHEP::c_light*CLHEP::ns/CLHEP::cm);
@@ -503,7 +552,8 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
         return;
     }
 
-    // Fill position histograms //
+    // Original
+    // Fill position histograms //positions3D_presel_Strip
     hits_positions_.positions3D->Fill(pdPos.z(),pdPos.x(),pdPos.y());
     hits_positions_.positions2D->Fill(pdPos.z(),std::hypot(pdPos.x(),pdPos.y())*((pdPos.y()>=0)-(pdPos.y()<0)));
     hits_positions_.positions2DAbs->Fill(fabs(pdPos.z()),std::hypot(pdPos.x(),pdPos.y()));
@@ -596,12 +646,60 @@ void Phase2TrackerBXHistogram::bookHistograms(DQMStore::IBooker & ibooker,edm::R
                                           offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
 
     /* Hit positions */
+    
+    // Hit positions custom
+    HistoName.str("");
+    HistoName << "HitsPositions3D_presel_2S";
+    hits_positions_.positions3D_presel_2S = ibooker.book3D(HistoName.str(), HistoName.str(),
+                                                 200,-280.,280.,
+                                                 200,-120.,120.,
+                                                 200,-120.,120.);
+    
+    HistoName.str("");
+    HistoName << "HitsPositions3D_presel_PS";
+    hits_positions_.positions3D_presel_PS = ibooker.book3D(HistoName.str(), HistoName.str(),
+                                                 200,-280.,280.,
+                                                 200,-120.,120.,
+                                                 200,-120.,120.);
+    
+    HistoName.str("");
+    HistoName << "HitsPositions3D_presel_Strip";
+    hits_positions_.positions3D_presel_Strip = ibooker.book3D(HistoName.str(), HistoName.str(),
+                                                 200,-280.,280.,
+                                                 200,-120.,120.,
+                                                 200,-120.,120.);
+    
+//    HistoName.str("");
+//    HistoName << "HitsPositions3D_postsel_2S";
+//    hits_positions_.positions3D_postsel_2S = ibooker.book3D(HistoName.str(), HistoName.str(),
+//                                                 200,-280.,280.,
+//                                                 200,-120.,120.,
+//                                                 200,-120.,120.);
+//
+//    HistoName.str("");
+//    HistoName << "HitsPositions3D_postsel_PS";
+//    hits_positions_.positions3D_postsel_PS = ibooker.book3D(HistoName.str(), HistoName.str(),
+//                                                 200,-280.,280.,
+//                                                 200,-120.,120.,
+//                                                 200,-120.,120.);
+//
+//    HistoName.str("");
+//    HistoName << "HitsPositions3D_postsel_Strip";
+//    hits_positions_.positions3D_postsel_Strip = ibooker.book3D(HistoName.str(), HistoName.str(),
+//                                                 200,-280.,280.,
+//                                                 200,-120.,120.,
+//                                                 200,-120.,120.);
+    
+    // maybe include for all subdetector parts?
+    
+    // final selection 3D
     HistoName.str("");
     HistoName << "HitsPositions3D";
     hits_positions_.positions3D = ibooker.book3D(HistoName.str(), HistoName.str(),
                                                  200,-280.,280.,
                                                  200,-120.,120.,
                                                  200,-120.,120.);
+    
     HistoName.str("");
     HistoName << "HitsPositions2D";
     hits_positions_.positions2D = ibooker.book2D(HistoName.str(), HistoName.str(),
@@ -714,11 +812,27 @@ bool Phase2TrackerBXHistogram::isPixel(const DetId& detId) {
     return (detId.subdetId() == PixelSubdetector::PixelBarrel ||  detId.subdetId() == PixelSubdetector::PixelEndcap);
 }
 
-bool Phase2TrackerBXHistogram::isStrip(const DetId& detId) {
+bool Phase2TrackerBXHistogram::isStrip(const DetId& detId, int subDetDiscriminant) {
     /*
         Check if hit on detid is strip
     */
-    return (detId.subdetId() == SiStripDetId::SubDetector::TIB || detId.subdetId() == SiStripDetId::SubDetector::TID || detId.subdetId() == SiStripDetId::SubDetector::TOB || detId.subdetId() == SiStripDetId::SubDetector::TEC);
+    if (subDetDiscriminant == 0) {
+        return (detId.subdetId() == SiStripDetId::SubDetector::TIB || detId.subdetId() == SiStripDetId::SubDetector::TID || detId.subdetId() == SiStripDetId::SubDetector::TOB || detId.subdetId() == SiStripDetId::SubDetector::TEC);
+        
+    }
+    else if (subDetDiscriminant == 1) {
+        return (detId.subdetId() == SiStripDetId::SubDetector::TIB);
+    }
+    else if (subDetDiscriminant == 2) {
+        return (detId.subdetId() == SiStripDetId::SubDetector::TID);
+    }
+    else if (subDetDiscriminant == 3) {
+        return (detId.subdetId() == SiStripDetId::SubDetector::TOB);
+    }
+    else if (subDetDiscriminant == 4) {
+        return (detId.subdetId() == SiStripDetId::SubDetector::TEC);
+    }
+    return 0;
 }
 
 bool Phase2TrackerBXHistogram::is2S(const DetId& detId, const TrackerGeometry* tGeom) {
