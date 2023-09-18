@@ -474,16 +474,22 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
     
     // Post selection 3D histograms
     // 0 for 2S/PS/Strip, 1 for 2S/PS without Strip, 2 for Strip without 2S/PS
+    // Ok this logic makes no sense
+    //
     if (specifyStripModule_ == 0){
-        if (PSor2S == -1 and isStripHit == -1) { return; }
+        // i.e., pass only if PSor2S AND Strip
+        if (PSor2S == -1 or isStripHit == -1) { return; }
     }
     else if (specifyStripModule_ == 1){
-        if (PSor2S == -1 and isStripHit != -1 ) { return; }
+        // pass only if PSor2S and NOT Strip
+        if (PSor2S == -1 or isStripHit != -1 ) { return; }
     }
     else if (specifyStripModule_ == 2){
-        if (PSor2S != -1 and isStripHit == -1 ) { return; }
+        // pass only if PSor2S and if not strip
+        if (PSor2S != -1 or isStripHit == -1 ) { return; }
+        
+        PSor2S = 1;
     }
-    PSor2S = 1;
     
     // new position for checks
     // Fill position histograms //
