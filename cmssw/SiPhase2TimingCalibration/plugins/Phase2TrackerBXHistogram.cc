@@ -456,14 +456,14 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
         if (verbosity_ > 1){
             std::cout<<"\tIs a 2S module"<<std::endl;
         }
-        hits_positions_.positions3D_presel_PS->Fill(pdPos.z(),pdPos.x(),pdPos.y());
+        hits_positions_.positions3D_presel_2S->Fill(pdPos.z(),pdPos.x(),pdPos.y());
     }
     else if (isPS(detId, tGeom)) {
         PSor2S = 0;
         if (verbosity_ > 1){
             std::cout<<"\tIs a PS module"<<std::endl;
         }
-        hits_positions_.positions3D_presel_2S->Fill(pdPos.z(),pdPos.x(),pdPos.y());
+        hits_positions_.positions3D_presel_PS->Fill(pdPos.z(),pdPos.x(),pdPos.y());
     }
     
     if (PSor2S == -1) {
