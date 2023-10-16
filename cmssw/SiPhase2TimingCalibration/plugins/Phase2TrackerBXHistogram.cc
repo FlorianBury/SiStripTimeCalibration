@@ -452,7 +452,7 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
     switch (specifyStripModule_) {
         case 0:
             // o.g. (isStrip + 2S param.)
-            if (!isStrip) {
+            if (!isStrip_) {
                 if (verbosity_ > 1){
                     std::cout<<"\tNot a strip hit ("<< rawid <<") -> discarded"<<std::endl;
                 }
@@ -482,11 +482,11 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
             break;
         case 3:
             // 3 for Ph2 PS & 2S
-            if (isPS) {
+            if (isPS_) {
                 PSor2S = 0;
                 break;
             }
-            else if (is2S) {
+            else if (is2S_) {
                 PSor2S = 1;
                 break;
             }
