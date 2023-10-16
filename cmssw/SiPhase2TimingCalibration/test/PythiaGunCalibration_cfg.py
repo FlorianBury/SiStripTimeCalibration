@@ -60,7 +60,7 @@ options.register('stripmodule',
                  0,
                  VarParsing.multiplicity.singleton,
                  VarParsing.varType.int,
-                 "Specify strip module: 0 (2S/PS/Strip) | 1 (2S/PS) | 2 (Strip)")
+                 "Specify strip module: 0 (Strip) | 1 (2S) | 2 (PS) | 3 (2S/PS)")
                  
 options.register('subdetdisc',
                  0,
