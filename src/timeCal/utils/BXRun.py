@@ -31,6 +31,8 @@ DEFAULT_PARAMS = {
     'subdet'             : 'ALL',
     'offset'             : -1.,
     'verbose'            : 0,
+    'subdetdisc'         : 0,
+    'stripmodule'        : 0
 }
 
 SETUP_CMSSW = getEnv()['cmssw']['init']
@@ -330,7 +332,7 @@ def main():
             cluster = SLURMCluster()
         elif args.dask == 'htcondor':
             from dask_jobqueue import HTCondorCluster
-            cluster = HTCondorCluster()
+            cluster = HTCondorCluster(cores=1, memory='6GB', disk='1 GB')
         else:
             raise NotImplementedError(f'Dask mode {args.dask} not implemented')
         # Start client #

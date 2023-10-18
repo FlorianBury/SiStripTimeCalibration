@@ -62,6 +62,17 @@ options.register('PUfile',
                  VarParsing.multiplicity.singleton,
                  VarParsing.varType.string,
                  "Path to txt file containing the pileup events")
+options.register('stripmodule',
+                 0,
+                 VarParsing.multiplicity.singleton,
+                 VarParsing.varType.int,
+                 "Specify strip module: 0 (Strip) | 1 (2S) | 2 (PS) | 3 (2S/PS)")
+# can ideally remove this below part now
+options.register('subdetdisc',
+                 0,
+                 VarParsing.multiplicity.singleton,
+                 VarParsing.varType.int,
+                 "Specify subdetector part: 0 (all parts) | 1 (TIB) | 2 (TID) | 3 (TOB) | 4 (TEC)")
 
 
 options.parseArguments()
@@ -186,20 +197,22 @@ process.dump = cms.EDAnalyzer("EventContentAnalyzer")
 # Output definition
 import random
 if options.mode == 'scan':
-    filename = 'BXHistScan_subdet_{:s}_N_{:d}_pileup_{:d}_pt_{:.01f}_threshold_{:d}_thresholdsmearing_{:0.1f}_tofsmearing_{:0.1f}_raw'.format(
+    filename = 'BXHistScan_subdet_{:s}_N_{:d}_pileup_{:d}_pt_{:.01f}_threshold_{:d}_thresholdsmearing_{:0.1f}_tofsmearing_{:0.1f}_subdetdisc_{0:d}_stripmodule_{0:d}_raw'.format(
                     options.subdet,
                     options.N,
                     options.pileup,
                     options.pt,
                     int(options.threshold),
                     options.thresholdsmearing,
-                    options.tofsmearing)
+                    options.tofsmearing,
+                    options.subdetdisc,
+                    options.stripmodule)
 elif options.mode == 'emulate':
     if options.offset == -1.:
         offset_emulate = round(random.random()*50,2)
     else:
         offset_emulate = round(options.offset,2)
-    filename = 'BXHistEmulateDelay_{:0.2f}_subdet_{:s}_N_{:d}_pileup_{:d}_pt_{:.01f}_threshold{:d}_thresholdsmearing_{:0.1f}_tofsmearing_{:0.1f}_raw'.format(
+    filename = 'BXHistEmulateDelay_{:0.2f}_subdet_{:s}_N_{:d}_pileup_{:d}_pt_{:.01f}_threshold{:d}_thresholdsmearing_{:0.1f}_tofsmearing_{:0.1f}_subdetdisc_{0:d}_stripmodule_{0:d}_raw'.format(
                     offset_emulate,
                     options.subdet,
                     options.N,
@@ -207,7 +220,9 @@ elif options.mode == 'emulate':
                     options.pt,
                     int(options.threshold),
                     options.thresholdsmearing,
-                    options.tofsmearing)
+                    options.tofsmearing,
+                    options.subdetdisc,
+                    options.stripmodule)
 else:
     raise RuntimeError("mode {} argument not understood".format(options.mode))
 
@@ -239,6 +254,8 @@ process.timeCalib.UseMixing = cms.bool(True)
 process.timeCalib.Mode = cms.string(options.mode)
 process.timeCalib.Subdetector = cms.string(options.subdet)
 process.timeCalib.VerbosityLevel = cms.int32(options.verbose)
+process.timeCalib.SpecifyStripModule = cms.int32(options.stripmodule)
+process.timeCalib.SubDetDiscriminant = cms.int32(options.subdetdisc)
 if options.mode == 'emulate':
     process.timeCalib.OffsetEmulate = cms.double(offset_emulate)
 
