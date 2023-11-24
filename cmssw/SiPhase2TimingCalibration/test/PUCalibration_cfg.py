@@ -197,7 +197,7 @@ process.dump = cms.EDAnalyzer("EventContentAnalyzer")
 # Output definition
 import random
 if options.mode == 'scan':
-    filename = 'BXHistScan_subdet_{:s}_N_{:d}_pileup_{:d}_pt_{:.01f}_threshold_{:d}_thresholdsmearing_{:0.1f}_tofsmearing_{:0.1f}_subdetdisc_{0:d}_stripmodule_{0:d}_raw'.format(
+    filename = 'BXHistScan_subdet_{:s}_N_{:d}_pileup_{:d}_pt_{:.01f}_threshold_{:d}_thresholdsmearing_{:0.1f}_tofsmearing_{:0.1f}_subdetdisc_{:d}_stripmodule_{:d}_raw'.format(
                     options.subdet,
                     options.N,
                     options.pileup,
@@ -212,7 +212,7 @@ elif options.mode == 'emulate':
         offset_emulate = round(random.random()*50,2)
     else:
         offset_emulate = round(options.offset,2)
-    filename = 'BXHistEmulateDelay_{:0.2f}_subdet_{:s}_N_{:d}_pileup_{:d}_pt_{:.01f}_threshold{:d}_thresholdsmearing_{:0.1f}_tofsmearing_{:0.1f}_subdetdisc_{0:d}_stripmodule_{0:d}_raw'.format(
+    filename = 'BXHistEmulateDelay_{:0.2f}_subdet_{:s}_N_{:d}_pileup_{:d}_pt_{:.01f}_threshold{:d}_thresholdsmearing_{:0.1f}_tofsmearing_{:0.1f}_subdetdisc_{:d}_stripmodule_{:d}_raw'.format(
                     offset_emulate,
                     options.subdet,
                     options.N,

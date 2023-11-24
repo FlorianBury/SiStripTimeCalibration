@@ -167,7 +167,7 @@ process.generator = cms.EDFilter("Pythia8PtGun",
 # Output definition
 import random
 if options.mode == 'scan':
-    filename = 'BXHistScan_subdet_{:s}_N_{:d}_pt_{:.01f}_threshold_{:d}_thresholdsmearing_{:0.1f}_tofsmearing_{:0.1f}_subdetdisc_{0:d}_stripmodule_{0:d}_raw'.format(
+    filename = 'BXHistScan_subdet_{:s}_N_{:d}_pt_{:.01f}_threshold_{:d}_thresholdsmearing_{:0.1f}_tofsmearing_{:0.1f}_subdetdisc_{:d}_stripmodule_{:d}_raw'.format(
                     options.subdet,
                     options.N,
                     options.pt,
