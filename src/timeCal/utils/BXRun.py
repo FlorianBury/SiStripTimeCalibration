@@ -30,9 +30,7 @@ DEFAULT_PARAMS = {
     'mode'               : 'scan',
     'subdet'             : 'ALL',
     'offset'             : -1.,
-    'verbose'            : 0,
-    'subdetdisc'         : 0,
-    'stripmodule'        : 0
+    'verbose'            : 0
 }
 
 SETUP_CMSSW = getEnv()['cmssw']['init']

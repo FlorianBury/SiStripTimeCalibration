@@ -94,8 +94,8 @@ Phase2TrackerBXHistogram::Phase2TrackerBXHistogram(const edm::ParameterSet& iCon
     geomToken_(esConsumes<TrackerGeometry, TrackerDigiGeometryRecord>(edm::ESInputTag{"", geomType_})),
     cbcPulseShapeParameters_(config_.getParameter<std::vector<double>>("CBCPulseShapeParameters")),
     mpaPulseShapeParameters_(config_.getParameter<std::vector<double>>("MPAPulseShapeParameters")),
-    specifyStripModule_(config_.getParameter<int>("SpecifyStripModule")),
-    subDetDiscriminant_(config_.getParameter<int>("SubDetDiscriminant")),
+//    specifyStripModule_(config_.getParameter<int>("SpecifyStripModule")),
+//    subDetDiscriminant_(config_.getParameter<int>("SubDetDiscriminant")),
     use_mixing_(config_.getParameter<bool>("UseMixing")),
     mode_(config_.getParameter<std::string>("Mode")),
     subdet_(config_.getParameter<std::string>("Subdetector")),
@@ -136,16 +136,16 @@ Phase2TrackerBXHistogram::Phase2TrackerBXHistogram(const edm::ParameterSet& iCon
         std::cout << "Threshold Smearing (Barrel) : "<<theThresholdSmearing_Barrel_<<std::endl;
         std::cout << "ToF smearing                : "<<tof_smearing_<<std::endl;
         // 0 for o.g. Strip (just 2S on all strip stuff), 1 for Ph2 2S, 2 for Ph2 PS, 3 for merged Ph2 2S + PS
-        std::cout << "Specify Strip Module        : "<<specifyStripModule_<<std::endl;
+//        std::cout << "Specify Strip Module        : "<<specifyStripModule_<<std::endl;
         if (mode_ == "emulate")
             std::cout << "Offset for emulation        : "<<offset_emulate_<<std::endl;
     }
     if (mode_ != "scan" && mode_ != "emulate"){
         throw std::invalid_argument("Mode "+mode_+" not understood");
     }
-    if (specifyStripModule_ != 0 && specifyStripModule_ != 1 && specifyStripModule_ != 2 && specifyStripModule_ != 3){
-        throw std::invalid_argument("Strip Module specification not understood");
-    }
+//    if (specifyStripModule_ != 0 && specifyStripModule_ != 1 && specifyStripModule_ != 2 && specifyStripModule_ != 3){
+//        throw std::invalid_argument("Strip Module specification not understood");
+//    }
 
     if (dims_per_subdet.find(subdet_) == dims_per_subdet.end()) {
         throw std::invalid_argument("Subdetector "+subdet_+" not understood");
@@ -429,10 +429,9 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
         return;
     }
     
-    // Check if Strip / 2S / PS
-    // subDetDiscriminant_ 0 = ALL, 1 = TIB, 2 = TID, 3 = TOB, 4 = TEC
-    bool isStrip_ = isStrip(detId, subDetDiscriminant_);
-    bool isPS_ = isPS(detId, tGeom);
+    // Check if 2S / PS
+    // bool isStrip_ = isStrip(detId, subDetDiscriminant_); // old strip method
+    bool isPS_ = isPS(detId, tGeom); // note this is only for PSP right now (i.e., pixel part of PS module with MPA)
     bool is2S_ = is2S(detId, tGeom);
     if (isPS_ && is2S_) {
         if (verbosity_ > 1) {
@@ -440,63 +439,19 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
         }
         return;
     }
+    if (!isPS_ && !is2S_) {
+        if (verbosity_ > 1) {
+            std::cout << "\tNot a 2S or PS hit ("<< rawid<<") --> discard"<<std::endl;
+        }
+        return;
+    }
     
-    // Handle the cases
-    // OLD: 0 for 2S/PS/Strip, 1 for 2S/PS without Strip, 2 for Strip without 2S/PS
-    // NEW specifyStripModule_ role
-    // 0 for o.g. (all Strip + 2S)
-    // 1 for Ph2 2S
-    // 2 for Ph2 PS (assuming PS is just MPA for now)
-    // 3 for Ph3 2S + PS
     int PSor2S = -1;
-    switch (specifyStripModule_) {
-        case 0:
-            // o.g. (isStrip + 2S param.)
-            if (!isStrip_) {
-                if (verbosity_ > 1){
-                    std::cout<<"\tNot a strip hit ("<< rawid <<") -> discarded"<<std::endl;
-                }
-                return;
-            }
-            PSor2S = 1;
-            break;
-        case 1:
-            // 1 for Ph2 2S
-            if (!is2S_) {
-                if (verbosity_ > 1){
-                    std::cout<<"\tNot a (Ph2) 2S hit ("<< rawid <<") -> discarded"<<std::endl;
-                }
-                return;
-            }
-            PSor2S = 1;
-            break;
-        case 2:
-            // 2 for Ph2 PS
-            if (!isPS_) {
-                if (verbosity_ > 1){
-                    std::cout<<"\tNot a (Ph2) PS hit ("<< rawid <<") -> discarded"<<std::endl;
-                }
-                return;
-            }
-            PSor2S = 0;
-            break;
-        case 3:
-            // 3 for Ph2 PS & 2S
-            if (isPS_) {
-                PSor2S = 0;
-                break;
-            }
-            else if (is2S_) {
-                PSor2S = 1;
-                break;
-            }
-            else {
-                if (verbosity_ > 1){
-                    std::cout<<"\tNot a (Ph2) PS or (Ph2) 2S hit ("<< rawid <<") -> discarded"<<std::endl;
-                }
-                return;
-            }
-            
+    if (is2S_) {
+        PSor2S = 1;
+    }
+    else if (isPS_) {
+        PSor2S = 0;
     }
     
     // hits_positions_.positions3D_presel_Strip->Fill(pdPos.z(),pdPos.x(),pdPos.y());
@@ -557,8 +512,21 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
     hits_positions_.positions3D->Fill(pdPos.z(),pdPos.x(),pdPos.y());
     hits_positions_.positions2D->Fill(pdPos.z(),std::hypot(pdPos.x(),pdPos.y())*((pdPos.y()>=0)-(pdPos.y()<0)));
     hits_positions_.positions2DAbs->Fill(fabs(pdPos.z()),std::hypot(pdPos.x(),pdPos.y()));
+    
+    if (PSor2S == 1) {
+        hits_positions_.positions3D_2S->Fill(pdPos.z(),pdPos.x(),pdPos.y());
+        hits_positions_.positions2D_2S->Fill(pdPos.z(),std::hypot(pdPos.x(),pdPos.y())*((pdPos.y()>=0)-(pdPos.y()<0)));
+        hits_positions_.positions2DAbs_2S->Fill(fabs(pdPos.z()),std::hypot(pdPos.x(),pdPos.y()));
+    }
+    
+    else if (PSor2S == 0) {
+        hits_positions_.positions3D_PS->Fill(pdPos.z(),pdPos.x(),pdPos.y());
+        hits_positions_.positions2D_PS->Fill(pdPos.z(),std::hypot(pdPos.x(),pdPos.y())*((pdPos.y()>=0)-(pdPos.y()<0)));
+        hits_positions_.positions2DAbs_PS->Fill(fabs(pdPos.z()),std::hypot(pdPos.x(),pdPos.y()));
+    }
 
     // Loop over relative BX //
+    // Might have to change hit detect logic //
     int attSampled = 0;
     int attLatched = 0;
     for (int bx = bx_true-bx_range_; bx <= bx_true+bx_range_; bx ++){
@@ -568,6 +536,14 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
         if (Phase2TrackerBXHistogram::select_hit(charge,bx,toa,detId,Phase2TrackerBXHistogram::SampledMode,PSor2S)){
             offsetBX_[offset].Sampled->Fill(bx-0.5-1);
             offsetBXMap_.Sampled->Fill(bx-0.5-1,offset);
+            if (PSor2S == 1) {
+                offsetBX_[offset].Sampled_2S->Fill(bx-0.5-1);
+                offsetBXMap_.Sampled_2S->Fill(bx-0.5-1,offset);
+            }
+            else if (PSor2S == 0) {
+                offsetBX_[offset].Sampled_PS->Fill(bx-0.5-1);
+                offsetBXMap_.Sampled_PS->Fill(bx-0.5-1,offset);
+            }
             if (verbosity_>2)
                 std::cout<<"   Sampled fired"<<std::endl;
             attSampled++;
@@ -576,15 +552,40 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
         if (Phase2TrackerBXHistogram::select_hit(charge,bx,toa,detId,Phase2TrackerBXHistogram::LatchedMode,PSor2S)){
             offsetBX_[offset].Latched->Fill(bx-0.5-1);
             offsetBXMap_.Latched->Fill(bx-0.5-1,offset);
+            if (PSor2S == 1) {
+                offsetBX_[offset].Sampled_2S->Fill(bx-0.5-1);
+                offsetBXMap_.Sampled_2S->Fill(bx-0.5-1,offset);
+            }
+            else if (PSor2S == 0) {
+                offsetBX_[offset].Sampled_PS->Fill(bx-0.5-1);
+                offsetBXMap_.Sampled_PS->Fill(bx-0.5-1,offset);
+            }
             if (verbosity_>2)
                 std::cout<<"   Latched fired"<<std::endl;
             attLatched++;
         }
         hitsTrueMap_.Sampled->Fill(bx-0.5-1,offset);
         hitsTrueMap_.Latched->Fill(bx-0.5-1,offset);
+        if (PSor2S == 1) {
+            hitsTrueMap_.Sampled_2S->Fill(bx-0.5-1,offset);
+            hitsTrueMap_.Latched_2S->Fill(bx-0.5-1,offset);
+        }
+        else if (PSor2S == 0) {
+            hitsTrueMap_.Sampled_PS->Fill(bx-0.5-1,offset);
+            hitsTrueMap_.Latched_PS->Fill(bx-0.5-1,offset);
+        }
+        
     }
     attBXMap_.Sampled->Fill(attSampled,offset);
     attBXMap_.Latched->Fill(attLatched,offset);
+    if (PSor2S == 1) {
+        attBXMap_.Sampled_2S->Fill(attSampled,offset);
+        attBXMap_.Latched_2S->Fill(attLatched,offset);
+    }
+    else if (PSor2S == 1) {
+        attBXMap_.Sampled_PS->Fill(attSampled,offset);
+        attBXMap_.Latched_PS->Fill(attLatched,offset);
+    }
 }
 
 
@@ -614,11 +615,37 @@ void Phase2TrackerBXHistogram::bookHistograms(DQMStore::IBooker & ibooker,edm::R
     offsetBXMap_.Sampled = ibooker.book2D(HistoName.str(), HistoName.str(),
                                           (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5,
                                           offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
+    HistoName.str("");
+    HistoName << "OffsetScanSampled_2S";
+    offsetBXMap_.Sampled_2S = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                            (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5,
+                                            offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
+    HistoName.str("");
+    HistoName << "OffsetScanSampled_PS";
+    offsetBXMap_.Sampled_PS = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                            (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5,
+                                            offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
+    
     HistoName.str("");
     HistoName << "OffsetScanLatched";
     offsetBXMap_.Latched = ibooker.book2D(HistoName.str(), HistoName.str(),
                                           (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5,
                                           offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
+    HistoName.str("");
+    HistoName << "OffsetScanLatched_2S";
+    offsetBXMap_.Latched_2S = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                            (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5,
+                                            offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
+    HistoName.str("");
+    HistoName << "OffsetScanLatched_PS";
+    offsetBXMap_.Latched_PS = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                            (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5,
+                                            offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
 
     /* Attribution scan */
     HistoName.str("");
@@ -626,11 +653,37 @@ void Phase2TrackerBXHistogram::bookHistograms(DQMStore::IBooker & ibooker,edm::R
     attBXMap_.Sampled = ibooker.book2D(HistoName.str(), HistoName.str(),
                                        5,-0.5,4.5,
                                        offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
+    HistoName.str("");
+    HistoName << "AttributionScanSampled_2S";
+    attBXMap_.Sampled_2S = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                          5,-0.5,4.5,
+                                          offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
+    HistoName.str("");
+    HistoName << "AttributionScanSampled_PS";
+    attBXMap_.Sampled_PS = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                          5,-0.5,4.5,
+                                          offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
     HistoName.str("");
     HistoName << "AttributionScanLatched";
     attBXMap_.Latched = ibooker.book2D(HistoName.str(), HistoName.str(),
                                        5,-0.5,4.5,
                                        offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
+    HistoName.str("");
+    HistoName << "AttributionScanLatched_2S";
+    attBXMap_.Latched_2S = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                          5,-0.5,4.5,
+                                          offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
+    HistoName.str("");
+    HistoName << "AttributionScanLatched_PS";
+    attBXMap_.Latched_PS = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                          5,-0.5,4.5,
+                                          offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
 
     /* Efficiency true scan */
     HistoName.str("");
@@ -638,64 +691,55 @@ void Phase2TrackerBXHistogram::bookHistograms(DQMStore::IBooker & ibooker,edm::R
     hitsTrueMap_.Sampled = ibooker.book2D(HistoName.str(), HistoName.str(),
                                           (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5,
                                           offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
+    HistoName.str("");
+    HistoName << "HitsTrueNumberScanSampled_2S";
+    hitsTrueMap_.Sampled_2S = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                            (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5,
+                                            offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
+    HistoName.str("");
+    HistoName << "HitsTrueNumberScanSampled_PS";
+    hitsTrueMap_.Sampled_PS = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                            (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5,
+                                            offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
 
     HistoName.str("");
     HistoName << "HitsTrueNumberScanLatched";
     hitsTrueMap_.Latched = ibooker.book2D(HistoName.str(), HistoName.str(),
                                           (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5,
                                           offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
+    HistoName.str("");
+    HistoName << "HitsTrueNumberScanLatched_2S";
+    hitsTrueMap_.Latched_2S = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                            (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5,
+                                            offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
+    HistoName.str("");
+    HistoName << "HitsTrueNumberScanLatched_PS";
+    hitsTrueMap_.Latched_PS = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                            (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5,
+                                            offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
 
     /* Hit positions */
-    
-    // Hit positions custom
-//    HistoName.str("");
-//    HistoName << "HitsPositions3D_presel_2S";
-//    hits_positions_.positions3D_presel_2S = ibooker.book3D(HistoName.str(), HistoName.str(),
-//                                                 200,-280.,280.,
-//                                                 200,-120.,120.,
-//                                                 200,-120.,120.);
-//    
-//    HistoName.str("");
-//    HistoName << "HitsPositions3D_presel_PS";
-//    hits_positions_.positions3D_presel_PS = ibooker.book3D(HistoName.str(), HistoName.str(),
-//                                                 200,-280.,280.,
-//                                                 200,-120.,120.,
-//                                                 200,-120.,120.);
-//    
-//    HistoName.str("");
-//    HistoName << "HitsPositions3D_presel_Strip";
-//    hits_positions_.positions3D_presel_Strip = ibooker.book3D(HistoName.str(), HistoName.str(),
-//                                                 200,-280.,280.,
-//                                                 200,-120.,120.,
-//                                                 200,-120.,120.);
-    
-//    HistoName.str("");
-//    HistoName << "HitsPositions3D_postsel_2S";
-//    hits_positions_.positions3D_postsel_2S = ibooker.book3D(HistoName.str(), HistoName.str(),
-//                                                 200,-280.,280.,
-//                                                 200,-120.,120.,
-//                                                 200,-120.,120.);
-//
-//    HistoName.str("");
-//    HistoName << "HitsPositions3D_postsel_PS";
-//    hits_positions_.positions3D_postsel_PS = ibooker.book3D(HistoName.str(), HistoName.str(),
-//                                                 200,-280.,280.,
-//                                                 200,-120.,120.,
-//                                                 200,-120.,120.);
-//
-//    HistoName.str("");
-//    HistoName << "HitsPositions3D_postsel_Strip";
-//    hits_positions_.positions3D_postsel_Strip = ibooker.book3D(HistoName.str(), HistoName.str(),
-//                                                 200,-280.,280.,
-//                                                 200,-120.,120.,
-//                                                 200,-120.,120.);
-    
-    // maybe include for all subdetector parts?
-    
-    // final selection 3D
     HistoName.str("");
     HistoName << "HitsPositions3D";
     hits_positions_.positions3D = ibooker.book3D(HistoName.str(), HistoName.str(),
+                                                 200,-280.,280.,
+                                                 200,-120.,120.,
+                                                 200,-120.,120.);
+    
+    HistoName.str("");
+    HistoName << "HitsPositions3D_2S";
+    hits_positions_.positions3D_2S = ibooker.book3D(HistoName.str(), HistoName.str(),
+                                                 200,-280.,280.,
+                                                 200,-120.,120.,
+                                                 200,-120.,120.);
+    
+    HistoName.str("");
+    HistoName << "HitsPositions3D_PS";
+    hits_positions_.positions3D_PS = ibooker.book3D(HistoName.str(), HistoName.str(),
                                                  200,-280.,280.,
                                                  200,-120.,120.,
                                                  200,-120.,120.);
@@ -705,9 +749,34 @@ void Phase2TrackerBXHistogram::bookHistograms(DQMStore::IBooker & ibooker,edm::R
     hits_positions_.positions2D = ibooker.book2D(HistoName.str(), HistoName.str(),
                                                  500,-280.,280.,
                                                  500,-120.,120.);
+    
+    HistoName.str("");
+    HistoName << "HitsPositions2D_2S";
+    hits_positions_.positions2D_2S = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                                 500,-280.,280.,
+                                                 500,-120.,120.);
+    
+    HistoName.str("");
+    HistoName << "HitsPositions2D_PS";
+    hits_positions_.positions2D_PS = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                                 500,-280.,280.,
+                                                 500,-120.,120.);
+    
     HistoName.str("");
     HistoName << "HitsPositions2DAbs";
     hits_positions_.positions2DAbs = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                                    1000,0.,280.,
+                                                    1000,0.,120.);
+    
+    HistoName.str("");
+    HistoName << "HitsPositions2DAbs_2S";
+    hits_positions_.positions2DAbs_2S = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                                    1000,0.,280.,
+                                                    1000,0.,120.);
+    
+    HistoName.str("");
+    HistoName << "HitsPositions2DAbs_PS";
+    hits_positions_.positions2DAbs_PS = ibooker.book2D(HistoName.str(), HistoName.str(),
                                                     1000,0.,280.,
                                                     1000,0.,120.);
 
@@ -738,17 +807,38 @@ Phase2TrackerBXHistogram::HistModes Phase2TrackerBXHistogram::bookBXHistos(DQMSt
 
     HistModes hist_modes;
 
-    HistoName.str("");
     std::string offsetStr = std::to_string(offset);
     std::replace(offsetStr.begin(), offsetStr.end(), '.', 'p');
-    HistoName << "BXHistogramSampledOffset" << offsetStr; 
+    
+    HistoName.str("");
+    HistoName << "BXHistogramSampledOffset" << offsetStr;
     hist_modes.Sampled = ibooker.book1D(HistoName.str(), HistoName.str(),
+                                        (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5);
+    
+    HistoName.str("");
+    HistoName << "BXHistogramSampledOffset_2S" << offsetStr;
+    hist_modes.Sampled_2S = ibooker.book1D(HistoName.str(), HistoName.str(),
+                                        (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5);
+    
+    HistoName.str("");
+    HistoName << "BXHistogramSampledOffset_PS" << offsetStr;
+    hist_modes.Sampled_PS = ibooker.book1D(HistoName.str(), HistoName.str(),
                                         (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5);
 
     HistoName.str("");
     HistoName << "BXHistogramLatchedOffset"  << offsetStr;
     hist_modes.Latched = ibooker.book1D(HistoName.str(), HistoName.str(),
                                         (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5);
+    
+    HistoName.str("");
+    HistoName << "BXHistogramLatchedOffset_2S"  << offsetStr;
+    hist_modes.Latched_2S = ibooker.book1D(HistoName.str(), HistoName.str(),
+                                          (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5);
+    
+    HistoName.str("");
+    HistoName << "BXHistogramLatchedOffset_PS"  << offsetStr;
+    hist_modes.Latched_PS = ibooker.book1D(HistoName.str(), HistoName.str(),
+                                          (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5);
 
     return hist_modes;
 }
@@ -812,27 +902,11 @@ bool Phase2TrackerBXHistogram::isPixel(const DetId& detId) {
     return (detId.subdetId() == PixelSubdetector::PixelBarrel ||  detId.subdetId() == PixelSubdetector::PixelEndcap);
 }
 
-bool Phase2TrackerBXHistogram::isStrip(const DetId& detId, int subDetDiscriminant) {
+bool Phase2TrackerBXHistogram::isStrip(const DetId& detId) {
     /*
         Check if hit on detid is strip
     */
-    if (subDetDiscriminant == 0) {
-        return (detId.subdetId() == SiStripDetId::SubDetector::TIB || detId.subdetId() == SiStripDetId::SubDetector::TID || detId.subdetId() == SiStripDetId::SubDetector::TOB || detId.subdetId() == SiStripDetId::SubDetector::TEC);
-        
-    }
-    else if (subDetDiscriminant == 1) {
-        return (detId.subdetId() == SiStripDetId::SubDetector::TIB);
-    }
-    else if (subDetDiscriminant == 2) {
-        return (detId.subdetId() == SiStripDetId::SubDetector::TID);
-    }
-    else if (subDetDiscriminant == 3) {
-        return (detId.subdetId() == SiStripDetId::SubDetector::TOB);
-    }
-    else if (subDetDiscriminant == 4) {
-        return (detId.subdetId() == SiStripDetId::SubDetector::TEC);
-    }
-    return 0;
+    return (detId.subdetId() == SiStripDetId::SubDetector::TIB || detId.subdetId() == SiStripDetId::SubDetector::TID || detId.subdetId() == SiStripDetId::SubDetector::TOB || detId.subdetId() == SiStripDetId::SubDetector::TEC);
 }
 
 bool Phase2TrackerBXHistogram::is2S(const DetId& detId, const TrackerGeometry* tGeom) {
