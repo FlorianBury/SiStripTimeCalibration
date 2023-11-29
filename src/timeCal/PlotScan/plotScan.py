@@ -274,10 +274,9 @@ class PlotScan:
         if len(paramEntries) > 0:
             self.logger.warning('Missing parameters :')
             for paramEntry in paramEntries:
-                if pBool:
-                    self.logger.warning('...')
-                    for pName, pVal in paramEntry.items():
-                        self.logger.warning(f'\t{pName:30s} : {pVal}')
+                self.logger.warning('...')
+                for pName, pVal in paramEntry.items():
+                    self.logger.warning(f'\t{pName:30s} : {pVal}')
             raise RuntimeError('See missing parameters above')
         return files
 
