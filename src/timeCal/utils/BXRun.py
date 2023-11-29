@@ -144,7 +144,7 @@ class Task:
         # Save parameters in json #
         param_file = os.path.join(self.subdir,'params.json')
         with open(param_file,'w') as handle:
-            json.dump(self.params,handle)
+            json.dump(self.params,handle,indent=4)
         self.logger.info(f'Saved parameters to {param_file}')
 
         # Save parameters in root file #
