@@ -44,6 +44,7 @@ class Task:
         if not os.path.exists(self.script):
             raise RuntimeError(f'Cannot find script {self.script}')
         self.params = {**DEFAULT_PARAMS,**params}
+        self.params = {k,str(v) for k,v in self.params.items()} # Make them strings for easier comparison later
         if os.path.isabs(subdir):
             self.subdir = subdir
         else:
@@ -144,7 +145,7 @@ class Task:
         # Save parameters in json #
         param_file = os.path.join(self.subdir,'params.json')
         with open(param_file,'w') as handle:
-            json.dump(self.params,handle)
+            json.dump(self.params,handle,indent=4)
         self.logger.info(f'Saved parameters to {param_file}')
 
         # Save parameters in root file #
