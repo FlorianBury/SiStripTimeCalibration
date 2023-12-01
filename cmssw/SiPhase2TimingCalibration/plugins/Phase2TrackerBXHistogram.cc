@@ -434,9 +434,11 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
     bool isPS_ = isPS(detId, tGeom); // note this is only for PSP right now (i.e., pixel part of PS module with MPA)
     bool is2S_ = is2S(detId, tGeom);
     if (isPS_ && is2S_) {
-        if (verbosity_ > 1) {
-            std::cout << "Both 2S and PS not possible" << std::endl;
-        }
+        // check if this also happens, if not can remove because it shouldn't be possible right...
+        std::cout << "Both 2S and PS not possible" << std::endl;
+//        if (verbosity_ > 1) {
+//            std::cout << "Both 2S and PS not possible" << std::endl;
+//        }
         return;
     }
     if (!isPS_ && !is2S_) {
@@ -553,12 +555,12 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
             offsetBX_[offset].Latched->Fill(bx-0.5-1);
             offsetBXMap_.Latched->Fill(bx-0.5-1,offset);
             if (PSor2S == 1) {
-                offsetBX_[offset].Sampled_2S->Fill(bx-0.5-1);
-                offsetBXMap_.Sampled_2S->Fill(bx-0.5-1,offset);
+                offsetBX_[offset].Latched_2S->Fill(bx-0.5-1);
+                offsetBXMap_.Latched_2S->Fill(bx-0.5-1,offset);
             }
             else if (PSor2S == 0) {
-                offsetBX_[offset].Sampled_PS->Fill(bx-0.5-1);
-                offsetBXMap_.Sampled_PS->Fill(bx-0.5-1,offset);
+                offsetBX_[offset].Latched_PS->Fill(bx-0.5-1);
+                offsetBXMap_.Latched_PS->Fill(bx-0.5-1,offset);
             }
             if (verbosity_>2)
                 std::cout<<"   Latched fired"<<std::endl;
@@ -582,7 +584,7 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
         attBXMap_.Sampled_2S->Fill(attSampled,offset);
         attBXMap_.Latched_2S->Fill(attLatched,offset);
     }
-    else if (PSor2S == 1) {
+    else if (PSor2S == 0) {
         attBXMap_.Sampled_PS->Fill(attSampled,offset);
         attBXMap_.Latched_PS->Fill(attLatched,offset);
     }
@@ -1029,7 +1031,7 @@ bool Phase2TrackerBXHistogram::select_hit_latchedMode(float charge, int bx, floa
     
     for (float i = deadTime_; i <= bx_time; i++) {
         // double sigScale = getSignalScale(sampling_time - toa + i);
-        double sigScale = (this->*getSignalScale)(sampling_time - toa);
+        double sigScale = (this->*getSignalScale)(sampling_time - toa + i);
         // double sigScale = pulseScalePtr( sampling_time - toa );
         if (verbosity_>3)
             std::cout<<"\tTime "<<sampling_time - toa + i <<" : (scale) "<<sigScale<<" * (charge) "<<charge<< " = "<<sigScale*charge<<" -> Trigger "<<int(sigScale * charge > threshold)<<std::endl;

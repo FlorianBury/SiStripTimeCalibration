@@ -44,7 +44,7 @@ class Task:
         if not os.path.exists(self.script):
             raise RuntimeError(f'Cannot find script {self.script}')
         self.params = {**DEFAULT_PARAMS,**params}
-        self.params = {k,str(v) for k,v in self.params.items()} # Make them strings for easier comparison later
+        self.params = {k:str(v) for k,v in self.params.items()} # Make them strings for easier comparison later
         if os.path.isabs(subdir):
             self.subdir = subdir
         else:

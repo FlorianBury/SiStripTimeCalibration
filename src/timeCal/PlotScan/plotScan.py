@@ -397,7 +397,7 @@ class PlotScan:
                     plt.title(title,fontsize=20,pad=25)
                     plt.tick_params(axis='both', which='major', labelsize=14)
                     self.logger.info('... '+title.replace("\n"," : "))
-                    fig.savefig(f'{os.path.join(output_plots_dir,fig_name)}_1D.png')
+                    fig.savefig(f'{os.path.join(output_plots_dir,fig_name)}_1D.pdf')
                     plt.close()
 
                     # Plot 2D #
@@ -411,7 +411,7 @@ class PlotScan:
                     ax.set_ylabel(param,fontsize=18,labelpad=20)
                     ax.set_title(title,fontsize=20,pad=25)
                     ax.tick_params(axis='both', which='major', labelsize=14)
-                    fig.savefig(f'{os.path.join(output_plots_dir,fig_name)}_2D.png')
+                    fig.savefig(f'{os.path.join(output_plots_dir,fig_name)}_2D.pdf')
                     plt.close()
 
                     # Save in ROOT file #
