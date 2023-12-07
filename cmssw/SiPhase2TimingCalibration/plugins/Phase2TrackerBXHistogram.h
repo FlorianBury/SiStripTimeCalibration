@@ -152,10 +152,12 @@ class Phase2TrackerBXHistogram : public DQMEDAnalyzer{
         double getMPAPulseScale(double xval) const;
         void storeCBCPulseShape();
         void storeMPAPulseShape();
+        void printoutSignalShape(const std::vector<double>& vec, std::string sep);
+    
 
         // Select hit variables //
         static constexpr float bx_time{25};
-        static constexpr size_t interpolationPoints{1000};
+        static constexpr size_t interpolationPoints{1600};
         static constexpr int interpolationStep{10};
 
         // Select Hit logics //

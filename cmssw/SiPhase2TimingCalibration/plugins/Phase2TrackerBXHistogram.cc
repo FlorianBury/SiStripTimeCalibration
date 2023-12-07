@@ -294,6 +294,13 @@ void Phase2TrackerBXHistogram::analyze(const edm::Event& iEvent, const edm::Even
         
         Phase2TrackerBXHistogram::storeCBCPulseShape();
         Phase2TrackerBXHistogram::storeMPAPulseShape();
+        
+        // cross-check to see if pulse shapes are sensible
+        std::cout << "CBC Pulse shape : " << std::endl;
+        printoutSignalShape(cbcPulseShapeVec_, ", ");
+        std::cout << "MPA Pulse shape : " << std::endl;
+        printoutSignalShape(mpaPulseShapeVec_, ", ");
+        
         if (verbosity_>1){
             std::cout << "CBC Pulse shape params : "<<std::endl;
             for(std::vector<double>::iterator psp = cbcPulseShapeParameters_.begin(); psp != cbcPulseShapeParameters_.end(); ++psp) {
@@ -576,7 +583,7 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
             hitsTrueMap_.Sampled_PS->Fill(bx-0.5-1,offset);
             hitsTrueMap_.Latched_PS->Fill(bx-0.5-1,offset);
         }
-        
+
     }
     attBXMap_.Sampled->Fill(attSampled,offset);
     attBXMap_.Latched->Fill(attLatched,offset);
@@ -588,6 +595,7 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
         attBXMap_.Sampled_PS->Fill(attSampled,offset);
         attBXMap_.Latched_PS->Fill(attLatched,offset);
     }
+    std::cout << "Charge from passed hit: " << charge << std::endl;
 }
 
 
@@ -1137,6 +1145,15 @@ void Phase2TrackerBXHistogram::storeMPAPulseShape() {
 
         mpaPulseShapeVec_.push_back(mpaPulseShape(val));
     }
+}
+
+void Phase2TrackerBXHistogram::printoutSignalShape(const std::vector<double>& vec,
+                                                 std::string sep) {
+    std::cout << "[ ";
+    for (double elem : vec) {
+            std::cout << elem << sep;
+        }
+    std::cout << "]" << std::endl;
 }
 
 double Phase2TrackerBXHistogram::getCBCPulseScale(double xval) const {
