@@ -215,7 +215,7 @@ class PlotScan:
         if not os.path.isabs(input):
             self.path = os.path.join(getEnv()['paths']['production'],input)
         else:
-            self.path = path
+            self.path = input
 
         # Observables and ranges #
         if observables is None:
@@ -243,7 +243,11 @@ class PlotScan:
     def getFilePaths(self):
         files = []
         paramEntries = [{k:v for k,v in zip(self.paramNames,paramValues)} for paramValues in self.paramValues]
+#        print(f"Param. entries:\n{paramEntries}")
+#        print(f"Directories: {glob.glob(os.path.join(self.path,'results','*'))}")
         for subdir in glob.glob(os.path.join(self.path,'results','*')):
+            if subdir != '/nfs/dust/cms/user/sanjrani/Tracker/SSTC_output/scans/run/thresholdScan/results/0':
+                continue
             # get params #
             json_path = os.path.join(subdir,'params.json')
             if not os.path.exists(json_path):
@@ -254,11 +258,21 @@ class PlotScan:
             # get file name if in the parameters #
             idx = None
             for i,paramEntry in enumerate(paramEntries):
+                print(f"i: {i}")
+                print(f"paramEntry: {paramEntry}")
+                print(f"paramEntry.items: {paramEntry.items()}")
+                print(f"params.items: {params.items()}")
+                print(f"paramEntry.items <= params.items(): {paramEntry.items() <= params.items()}")
                 if paramEntry.items() <= params.items():
                     idx = i
             if idx is not None:
                 # Mark and cleanup for faster loop #
+                print(f"idx: {idx}")
+                print(f"paramEntries: {paramEntries}")
+                print(f"paramEntries[idx]: {paramEntries[idx]}")
                 del paramEntries[idx]
+                print(f"paramEntries: {paramEntries}")
+                print(f"paramEntries[idx]: {paramEntries[idx]}")
                 # get file #
                 rfiles = glob.glob(os.path.join(subdir,'BX*harvested.root'))
                 if len(rfiles) == 0:
