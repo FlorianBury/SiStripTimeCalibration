@@ -153,13 +153,10 @@ class FileProcessor:
         return h_eff
 
     def _getFireRate(self,F):
-        h_true = self._getHistogram(F,self.firerate['dir'],self.firerate['truth'])
-        h_reco = self._getHistogram(F,self.firerate['dir'],self.firerate['reco'])
+        h = self._getHistogram(F,self.firerate['dir'],self.firerate['hist'])
         h_fire = h_reco.ProjectionY("fire",firstxbin=2) # BX = 0 -> no hit
-        h_true = h_true.ProjectionY("",
-                                    firstxbin  = h_true.GetXaxis().FindBin(0.),
-                                    lastxbin   = h_true.GetXaxis().FindBin(0.))
-        h_fire.Divide(h_true)
+        h_tot = h_reco.ProjectionY("tot")
+        h_fire.Divide(h_tot)
         return h_fire
 
     @staticmethod
