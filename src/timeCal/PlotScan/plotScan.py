@@ -153,10 +153,17 @@ class FileProcessor:
         return h_eff
 
     def _getFireRate(self,F):
-        h_reco = self._getHistogram(F,self.firerate['dir'],self.firerate['hist'])
+#        h_reco = self._getHistogram(F,self.firerate['dir'],self.firerate['hist'])
+#        h_fire = h_reco.ProjectionY("fire",firstxbin=2) # BX = 0 -> no hit
+#        h_tot = h_reco.ProjectionY("tot")
+#        h_fire.Divide(h_tot)
+        h_true = self._getHistogram(F,self.firerate['dir'],self.firerate['truth'])
+        h_reco = self._getHistogram(F,self.firerate['dir'],self.firerate['reco'])
         h_fire = h_reco.ProjectionY("fire",firstxbin=2) # BX = 0 -> no hit
-        h_tot = h_reco.ProjectionY("tot")
-        h_fire.Divide(h_tot)
+        h_true = h_true.ProjectionY("",
+                                    firstxbin  = h_true.GetXaxis().FindBin(0.),
+                                    lastxbin   = h_true.GetXaxis().FindBin(0.))
+        h_fire.Divide(h_true)
         return h_fire
 
     @staticmethod
@@ -246,8 +253,9 @@ class PlotScan:
 #        print(f"Param. entries:\n{paramEntries}")
 #        print(f"Directories: {glob.glob(os.path.join(self.path,'results','*'))}")
         for subdir in glob.glob(os.path.join(self.path,'results','*')):
-#            if subdir != '/nfs/dust/cms/user/sanjrani/Tracker/SSTC_output/scans/run/thresholdScan/results/0':
+#            if subdir != '/nfs/dust/cms/user/sanjrani/Tracker/SSTC_output/scans/run/thresholdScan3/results/0':
 #                continue
+#            print(f"subdir: {subdir}")
             # get params #
             json_path = os.path.join(subdir,'params.json')
             if not os.path.exists(json_path):
@@ -282,6 +290,7 @@ class PlotScan:
                 else:
                     raise RuntimeError(f'More than one harvested root file in {subdir}, this might lead to bugs')
                 files.append(rfiles[0])
+#        print(f"Len param entries after: {len(paramEntries)}")
         if len(paramEntries) > 0:
             self.logger.warning('Missing parameters :')
             for paramEntry in paramEntries:

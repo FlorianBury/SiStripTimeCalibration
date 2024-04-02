@@ -102,6 +102,7 @@ Phase2TrackerBXHistogram::Phase2TrackerBXHistogram(const edm::ParameterSet& iCon
     bx_range_(config_.getParameter<int>("BXRange")),
     deadTime_(config_.getParameter<double>("CBCDeadTime")),
     pTCut_(config_.getParameter<double>("PTCut")),
+    addBiasRailInefficiency_(config_.getParameter<bool>("AddBiasRailInefficiency")),
     theTofLowerCut_(config_.getParameter<double>("TofLowerCut")),
     theTofUpperCut_(config_.getParameter<double>("TofUpperCut")),
     offset_min_(config_.getParameter<double>("OffsetMin")),
@@ -296,10 +297,10 @@ void Phase2TrackerBXHistogram::analyze(const edm::Event& iEvent, const edm::Even
         Phase2TrackerBXHistogram::storeMPAPulseShape();
         
         // cross-check to see if pulse shapes are sensible
-        std::cout << "CBC Pulse shape : " << std::endl;
-        printoutSignalShape(cbcPulseShapeVec_, ", ");
-        std::cout << "MPA Pulse shape : " << std::endl;
-        printoutSignalShape(mpaPulseShapeVec_, ", ");
+        // std::cout << "CBC Pulse shape : " << std::endl;
+        // printoutSignalShape(cbcPulseShapeVec_, ", ");
+        // std::cout << "MPA Pulse shape : " << std::endl;
+        // printoutSignalShape(mpaPulseShapeVec_, ", ");
         
         if (verbosity_>1){
             std::cout << "CBC Pulse shape params : "<<std::endl;
@@ -442,7 +443,9 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
     bool is2S_ = is2S(detId, tGeom);
     if (isPS_ && is2S_) {
         // check if this also happens, if not can remove because it shouldn't be possible right...
-        std::cout << "Both 2S and PS not possible" << std::endl;
+        if (verbosity_ > 1) {
+            std::cout << "Both 2S and PS not possible" << std::endl;
+        }
 //        if (verbosity_ > 1) {
 //            std::cout << "Both 2S and PS not possible" << std::endl;
 //        }
@@ -516,8 +519,14 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
         }
         return;
     }
+    
+    if (addBiasRailInefficiency_ && Phase2TrackerBXHistogram::isInBiasRailRegion(simHit) && (PSor2S==0)) {
+        return;
+    }
 
     // Fill position histograms //positions3D_presel_Strip
+    // Just to note, that this happens before any select_hit algorithm...
+    // Might be interesting to fill these histograms after...
     hits_positions_.positions3D->Fill(pdPos.z(),pdPos.x(),pdPos.y());
     hits_positions_.positions2D->Fill(pdPos.z(),std::hypot(pdPos.x(),pdPos.y())*((pdPos.y()>=0)-(pdPos.y()<0)));
     hits_positions_.positions2DAbs->Fill(fabs(pdPos.z()),std::hypot(pdPos.x(),pdPos.y()));
@@ -536,11 +545,21 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
 
     // Loop over relative BX //
     // Might have to change hit detect logic //
+    // Should we be doing this separately for all 2S and PS variations?? //
+    // it's either 2S or PS 
     int attSampled = 0;
     int attLatched = 0;
+    int attSimple = 0;
     for (int bx = bx_true-bx_range_; bx <= bx_true+bx_range_; bx ++){
         if (verbosity_>2)
             std::cout << "True BX = "<< bx_true << " -> Looking at "<<bx<<std::endl;
+        /* Simple PS-p digitizer algorithm */
+        if (Phase2TrackerBXHistogram::select_hit_simplePSP(bx, toa, PSor2S, offset)){
+            offsetBX_[offset].Simple_PS->Fill(bx-0.5-1);
+            offsetBXMap_.Simple_PS->Fill(bx-0.5-1,offset);
+            attSimple++;
+        }
+        
         /* Sampled mode */
         if (Phase2TrackerBXHistogram::select_hit(charge,bx,toa,detId,Phase2TrackerBXHistogram::SampledMode,PSor2S)){
             offsetBX_[offset].Sampled->Fill(bx-0.5-1);
@@ -582,6 +601,7 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
         else if (PSor2S == 0) {
             hitsTrueMap_.Sampled_PS->Fill(bx-0.5-1,offset);
             hitsTrueMap_.Latched_PS->Fill(bx-0.5-1,offset);
+            hitsTrueMap_.Simple_PS->Fill(bx-0.5-1,offset);
         }
 
     }
@@ -594,8 +614,13 @@ void Phase2TrackerBXHistogram::runSimHit(T isim,double offset, const TrackerTopo
     else if (PSor2S == 0) {
         attBXMap_.Sampled_PS->Fill(attSampled,offset);
         attBXMap_.Latched_PS->Fill(attLatched,offset);
+        attBXMap_.Simple_PS->Fill(attSimple,offset);
     }
-    std::cout << "Charge from passed hit: " << charge << std::endl;
+    if (verbosity_ > 2) {
+        std::cout << "Charge from passed hit: " << charge << std::endl;
+    }
+    
+    
 }
 
 
@@ -656,6 +681,12 @@ void Phase2TrackerBXHistogram::bookHistograms(DQMStore::IBooker & ibooker,edm::R
     offsetBXMap_.Latched_PS = ibooker.book2D(HistoName.str(), HistoName.str(),
                                             (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5,
                                             offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
+    HistoName.str("");
+    HistoName << "OffsetScanSimple_PS";
+    offsetBXMap_.Simple_PS = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                            (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5,
+                                            offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
 
     /* Attribution scan */
     HistoName.str("");
@@ -694,6 +725,11 @@ void Phase2TrackerBXHistogram::bookHistograms(DQMStore::IBooker & ibooker,edm::R
                                           5,-0.5,4.5,
                                           offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
     
+    HistoName.str("");
+    HistoName << "AttributionScanSimple_PS";
+    attBXMap_.Simple_PS = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                          5,-0.5,4.5,
+                                          offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
 
     /* Efficiency true scan */
     HistoName.str("");
@@ -729,6 +765,12 @@ void Phase2TrackerBXHistogram::bookHistograms(DQMStore::IBooker & ibooker,edm::R
     HistoName.str("");
     HistoName << "HitsTrueNumberScanLatched_PS";
     hitsTrueMap_.Latched_PS = ibooker.book2D(HistoName.str(), HistoName.str(),
+                                            (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5,
+                                            offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
+    
+    HistoName.str("");
+    HistoName << "HitsTrueNumberScanSimple_PS";
+    hitsTrueMap_.Simple_PS = ibooker.book2D(HistoName.str(), HistoName.str(),
                                             (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5,
                                             offset_scan_.size(),offset_min_-(offset_step_/2),offset_max_+(offset_step_/2));
 
@@ -849,6 +891,11 @@ Phase2TrackerBXHistogram::HistModes Phase2TrackerBXHistogram::bookBXHistos(DQMSt
     HistoName << "BXHistogramLatchedOffset_PS"  << offsetStr;
     hist_modes.Latched_PS = ibooker.book1D(HistoName.str(), HistoName.str(),
                                           (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5);
+    
+    HistoName.str("");
+    HistoName << "BXHistogramSimpleOffset_PS"  << offsetStr;
+    hist_modes.Simple_PS = ibooker.book1D(HistoName.str(), HistoName.str(),
+                                          (2*bx_range_)+1,-static_cast<float>(bx_range_)-0.5,static_cast<float>(bx_range_)+0.5);
 
     return hist_modes;
 }
@@ -939,6 +986,22 @@ bool Phase2TrackerBXHistogram::isPS(const DetId& detId, const TrackerGeometry* t
     return (mType == TrackerGeometry::ModuleType::Ph2PSP);
 }
 
+bool Phase2TrackerBXHistogram::select_hit_simplePSP(int bx, float toa, int PSor2S, double offset){
+    if (PSor2S == 1) {
+        return false;
+    }
+    
+    toa -= bx * bx_time;
+//    // std::cout << "Simple hit: (bx: " << bx << "), (toa: " << toa << ")" << std::endl;
+//    std::cout << "Simple hit: " << std::endl;
+//    std::cout << "  (bx: " << bx << "), (og toa: " << (toa + (bx*bx_time)) << "), ( new toa: " << toa << "), (offset: " << offset << ")" << std::endl;
+//    std::cout << "  (window low: " << (theTofLowerCut_+offset) << "), (window high: " << (theTofUpperCut_+offset) << ")" << std::endl;
+//    
+//    bool result = (toa > (theTofLowerCut_+offset) && toa < (theTofUpperCut_+offset));
+//    std::cout << "  result: " << result << std::endl;
+                                                       
+    return (toa > (theTofLowerCut_-offset) && toa < (theTofUpperCut_-offset));
+}
 
 bool Phase2TrackerBXHistogram::select_hit(float charge, int bx, float toa, DetId det_id, int hitDetectionMode, int PSor2S){
     /*
@@ -1264,6 +1327,21 @@ float Phase2TrackerBXHistogram::smearToFDetId(DetId det_id){
         }
         return smear->second;
     } 
+}
+
+// Check if hit is in the inefficient bias rail region
+bool Phase2TrackerBXHistogram::isInBiasRailRegion(const PSimHit& hit) const {
+    constexpr float implant = 0.1467;  // Implant length (1.467 mm)
+    constexpr float bRail = 0.00375;   // Bias Rail region which causes inefficiency (37.5micron)
+    // Do coordinate transformation of the local Y from module middle point considering 32 implants and 31 inter-impant regions with bias rail
+    constexpr float block_len = 16 * implant + 15.5 * bRail;
+    constexpr float block_unit = implant + bRail;
+    float yin = hit.entryPoint().y() + block_len;
+    float yout = hit.exitPoint().y() + block_len;
+    if (std::fmod(yin, block_unit) > implant || std::fmod(yout, block_unit) > implant)
+        return true;
+    else
+        return false;
 }
 
 

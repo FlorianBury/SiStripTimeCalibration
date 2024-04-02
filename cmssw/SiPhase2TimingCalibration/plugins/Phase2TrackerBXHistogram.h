@@ -73,6 +73,7 @@ class Phase2TrackerBXHistogram : public DQMEDAnalyzer{
             MonitorElement* Latched;
             MonitorElement* Latched_2S;
             MonitorElement* Latched_PS;
+            MonitorElement* Simple_PS;
         };
 
         struct HitsPositions{  // Save hit positions
@@ -162,9 +163,11 @@ class Phase2TrackerBXHistogram : public DQMEDAnalyzer{
 
         // Select Hit logics //
         enum { SquareWindow, SampledMode, LatchedMode, SampledOrLatchedMode, HIPFindingMode };
+        bool select_hit_simplePSP(int bx, float toa, int PSor2S, double offset);
         bool select_hit(float charge, int bx, float toa, DetId det_id, int hitDetectionMode, int PSor2S);
         bool select_hit_sampledMode(float charge, int bx, float toa, DetId det_id, float threshold, int PSor2S) const;
         bool select_hit_latchedMode(float charge, int bx, float toa, DetId det_id, float threshold, int PSor2S) const;
+        bool isInBiasRailRegion(const PSimHit& hit) const;
 
         // Config parameters //
         std::vector<double> cbcPulseShapeParameters_;
@@ -178,6 +181,7 @@ class Phase2TrackerBXHistogram : public DQMEDAnalyzer{
         int bx_range_;
         float deadTime_;
         double pTCut_;
+        bool addBiasRailInefficiency_;
         double theTofLowerCut_;
         double theTofUpperCut_;
         double offset_min_;
