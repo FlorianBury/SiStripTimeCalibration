@@ -23,12 +23,12 @@ def main(dir1, dir2, lxplus_naf):
         lxplus_naf_dir = "/nfs/dust/cms/user/sanjrani/Tracker"
         if (dir1 == None) or (dir2==None):
             dir1 = f"{lxplus_naf_dir}/SiStripTimeCalibration/cmssw/SiPhase2TimingCalibration"
-            dir2 = f"{lxplus_naf_dir}/CMSSW_12_5_0/src/SimTracker/SiPhase2TimingCalibration"
+            dir2 = f"{lxplus_naf_dir}/CMSSW_14_0_14/src/SimTracker/SiPhase2TimingCalibration"
     elif lxplus_naf == 'lxplus':
         lxplus_naf_dir = "/eos/user/m/msanjran/TrackerDev"
         if (dir1 == None) or (dir2==None):
             dir1 = f"{lxplus_naf_dir}/SiStripTimeCalibration/cmssw/SiPhase2TimingCalibration"
-            dir2 = f"{lxplus_naf_dir}/CMSSW_12_5_0/src/SimTracker/SiPhase2TimingCalibration"
+            dir2 = f"{lxplus_naf_dir}/CMSSW_14_0_14/src/SimTracker/SiPhase2TimingCalibration"
     
     print("-"*20)
     print(f"Copying from dir1 to dir2")
