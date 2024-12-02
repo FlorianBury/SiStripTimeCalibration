@@ -86,10 +86,11 @@ if __name__ == '__main__':
     parser.add_argument("-step", "--step", type=float, default=0.1,
                     help="Step size between delays (ns)")
                     
-    parser.add_argument("-mod", "--module_2S_PS", type=str, default='both', choices=['2S','PS','both'],
+    parser.add_argument("-mod", "--module_2S_PS", type=str, default='both', choices=['2S','PS','PSp','PSs','both'],
                     help="Which module to specify (or not 'both')")
                         
     main(**parser.parse_args().__dict__)
-    
+
+
     
     
