@@ -17,8 +17,8 @@ def look_for_harvested(output_dir):
     ''' look inside one of these output dirs for a ..._harvested.root file '''
     files = glob.glob(f"{output_dir}/*_harvested.root")
     if len(files) > 0:
-        return True
-    return False
+        return True, files
+    return False, files
     
 def look_for_nonempty_json(output_dir):
     ''' look inside one of the output dirs for a params.json file '''
@@ -35,7 +35,7 @@ def look_for_nonempty_json(output_dir):
     return False
     
     
-def main(input_dir, check_json):
+def main(input_dir, check_json, verbose):
 
     print("-"*20)
     print(f"Checking number of successful scans")
@@ -45,10 +45,14 @@ def main(input_dir, check_json):
     print(f"N. output directories: {len(output_directories)}")
     n_harvested = 0
     n_json = 0
+    harvested_dirs, unharvested_dirs = {}, {}
     for output_dir in tqdm(output_directories):
-        has_harvested = look_for_harvested(output_dir)
+        has_harvested, files_dir = look_for_harvested(output_dir)
         if has_harvested:
             n_harvested += 1
+            harvested_dirs[output_dir] = files_dir
+        else:
+            unharvested_dirs[output_dir] = files_dir
         if check_json:
             nonempty_json = look_for_nonempty_json(output_dir)
             if nonempty_json:
@@ -60,6 +64,17 @@ def main(input_dir, check_json):
     if check_json:
         print(f"N. non empty json files: {n_json}")
         print(f"{(n_json/len(output_directories))*100}% of produced json files")
+
+    if verbose:
+        print(f"Harvested dirs and files:")
+        for o in harvested_dirs:
+            print(f" - dir: {o}")
+            print(f" - - {harvested_dirs[o]}")
+        print("")
+        print(f"Unharvested dirs and files:")
+        for o in unharvested_dirs:
+            print(f" - dir: {o}")
+            print(f" - - {unharvested_dirs[o]}")
     
     print(f"Done")
     print("-"*20)
@@ -73,6 +88,9 @@ if __name__ == '__main__':
                         
     parser.add_argument("-j", "--check_json", action='store_true', default=False,
                         help="Check if the jsons are non empty")
+    
+    parser.add_argument("-v", "--verbose", action="store_true", default=False,
+                        help="Printout which ones are done which ones aren't")
                         
     main(**parser.parse_args().__dict__)
         
