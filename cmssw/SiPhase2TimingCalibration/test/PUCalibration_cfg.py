@@ -196,10 +196,10 @@ if options.mode == 'scan':
                     options.tofsmearing)
 elif options.mode == 'emulate':
     if options.offset == -1.:
-        offset_emulate = round(random.random()*50,2)
+        offset_emulate = round(random.random()*50,1)
     else:
-        offset_emulate = round(options.offset,2)
-    filename = 'BXHistEmulateDelay_{:0.2f}_subdet_{:s}_N_{:d}_pileup_{:d}_pt_{:.01f}_threshold{:d}_thresholdsmearing_{:0.1f}_tofsmearing_{:0.1f}_raw'.format(
+        offset_emulate = round(options.offset,1)
+    filename = 'BXHistEmulateDelay_{:0.1f}_subdet_{:s}_N_{:d}_pileup_{:d}_pt_{:.01f}_threshold{:d}_thresholdsmearing_{:0.1f}_tofsmearing_{:0.1f}_raw'.format(
                     offset_emulate,
                     options.subdet,
                     options.N,
@@ -265,6 +265,9 @@ process.FEVTDEBUGoutput_step = cms.EndPath(process.FEVTDEBUGoutput)
 process.dqm_step =  cms.Path(process.digiana_seq * process.dqm_comm )
 
 process.mix_step = cms.Path(process.mix)
+
+print("Starting schedule")
+
 # Schedule definition
 process.schedule = cms.Schedule(
     process.mix_step,
@@ -273,3 +276,4 @@ process.schedule = cms.Schedule(
     process.endjob_step
 )
 
+print("Done with PUCalibration_cfg")
